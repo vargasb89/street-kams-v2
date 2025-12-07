@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer utilities {
+  .debug-tw {
+    @apply border-4 border-red-500 bg-yellow-200;
+  }
+}
