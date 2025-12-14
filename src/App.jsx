@@ -416,12 +416,7 @@ const Modal = ({ message, onClose }) => (
   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
     <div className="bg-white rounded-xl shadow-lg p-4 max-w-sm w-full flex items-start">
       <div className="flex-1 text-sm text-gray-800">{message}</div>
-      <button
-        type="button"
-        className="ml-2 text-gray-500 hover:text-gray-800"
-        onClick={onClose}
-        aria-label="Cerrar"
-      >
+      <button type="button" className="ml-2 text-gray-500 hover:text-gray-800" onClick={onClose} aria-label="Cerrar">
         <X className="w-4 h-4" />
       </button>
     </div>
@@ -709,7 +704,7 @@ const App = () => {
     }
   };
 
-  // ✅ EXPORT CSV (FIX)
+  // ✅ CSV export (BLINDADO PARA WINDOWS / VERCEL)
   const exportToCSV = () => {
     if (visits.length === 0) {
       showStatusModal('No hay datos para exportar.');
@@ -736,13 +731,15 @@ const App = () => {
       'Timestamp',
     ];
 
-    // ✅ Sin regex – build safe
+    // Sin '\n' ni '\r' para evitar copy/paste roto en Windows
     const csvEscape = (value) => {
-  const s = (value ?? '').toString();
-  const noCR = s.replaceAll('\r', '');
-  const oneLine = noCR.replaceAll('\n', ' ');
-  return '"' + oneLine.replaceAll('"', '""') + '"';
-};
+      const s = (value ?? '').toString();
+      const CR = String.fromCharCode(13);
+      const LF = String.fromCharCode(10);
+      const noCR = s.replaceAll(CR, '');
+      const oneLine = noCR.replaceAll(LF, ' ');
+      return '"' + oneLine.replaceAll('"', '""') + '"';
+    };
 
     const csvRows = [headers.join(';')];
 
@@ -771,6 +768,7 @@ const App = () => {
 
     const LF = String.fromCharCode(10);
     const csvString = csvRows.join(LF);
+
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -778,6 +776,7 @@ const App = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
     showStatusModal('📥 Datos exportados correctamente a CSV.');
   };
 
@@ -792,10 +791,10 @@ const App = () => {
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
-        .hover\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
+        .hover\\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
         .text-rappi-main { color: var(--rappi-main); }
-        .focus\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
-        .focus\:border-rappi-main:focus { border-color: var(--rappi-main); }
+        .focus\\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
+        .focus\\:border-rappi-main:focus { border-color: var(--rappi-main); }
         .rappi-header-bg { background: linear-gradient(135deg, var(--rappi-accent), var(--rappi-main)); }
       `}</style>
 
@@ -805,11 +804,9 @@ const App = () => {
           style={{ '--rappi-accent': rappiAccent }}
         >
           <div className="flex items-center gap-4">
-            <img
-              src="/rappi-logo.png"
-              alt="Rappi"
-              className="w-14 h-14 rounded-xl bg-white p-1 shadow-md"
-            />
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white/20">
+              <img src="/rappi-logo-512.png" alt="Rappi" className="w-8 h-8 object-contain" />
+            </div>
 
             <div>
               <h1 className="text-3xl font-extrabold flex items-center drop-shadow-sm">
@@ -895,9 +892,7 @@ const App = () => {
               <button
                 onClick={() => setCurrentView('form')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'form'
-                    ? 'bg-rappi-main text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'form' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Formulario de Check-in
@@ -905,9 +900,7 @@ const App = () => {
               <button
                 onClick={() => setCurrentView('history')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'history'
-                    ? 'bg-rappi-main text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Historial de Visitas
