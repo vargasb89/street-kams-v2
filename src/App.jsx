@@ -739,8 +739,10 @@ const App = () => {
     // ✅ Sin regex – build safe
     const csvEscape = (value) => {
       const s = (value ?? '').toString();
-      const noCR = s.replaceAll('\r', '');
-      const oneLine = noCR.replaceAll('\n', ' ');
+      const noCR = s.replaceAll('
+', '');
+      const oneLine = noCR.replaceAll('
+', ' ');
       return '"' + oneLine.replaceAll('"', '""') + '"';
     };
 
@@ -769,7 +771,8 @@ const App = () => {
       csvRows.push(row.join(';'));
     });
 
-    const csvString = csvRows.join('\n');
+    const csvString = csvRows.join('
+');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -791,10 +794,10 @@ const App = () => {
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
-        .hover\\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
+        .hover\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
         .text-rappi-main { color: var(--rappi-main); }
-        .focus\\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
-        .focus\\:border-rappi-main:focus { border-color: var(--rappi-main); }
+        .focus\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
+        .focus\:border-rappi-main:focus { border-color: var(--rappi-main); }
         .rappi-header-bg { background: linear-gradient(135deg, var(--rappi-accent), var(--rappi-main)); }
       `}</style>
 
@@ -803,10 +806,21 @@ const App = () => {
           className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white"
           style={{ '--rappi-accent': rappiAccent }}
         >
-          <h1 className="text-3xl font-extrabold flex items-center drop-shadow-sm">
-            Street Kams App <Target className="w-6 h-6 ml-3" />
-          </h1>
-          <p className="mt-1 text-gray-100 drop-shadow-sm">Registro y Monitoreo de Visitas en Campo (KAM)</p>
+          <div className="flex items-center gap-4">
+            <img
+              src="/rappi-logo.png"
+              alt="Rappi"
+              className="w-14 h-14 rounded-xl bg-white p-1 shadow-md"
+            />
+
+            <div>
+              <h1 className="text-3xl font-extrabold flex items-center drop-shadow-sm">
+                Street Kams App <Target className="w-6 h-6 ml-3" />
+              </h1>
+              <p className="mt-1 text-gray-100 drop-shadow-sm">Registro y Monitoreo de Visitas en Campo (KAM)</p>
+            </div>
+          </div>
+
           <div className="mt-4 pt-3 border-t border-white border-opacity-30 flex items-center text-sm text-white">
             <User className="w-4 h-4 mr-2" />
             Usuario:{' '}
@@ -931,4 +945,3 @@ const App = () => {
 };
 
 export default App;
-
