@@ -738,13 +738,11 @@ const App = () => {
 
     // ✅ Sin regex – build safe
     const csvEscape = (value) => {
-      const s = (value ?? '').toString();
-      const noCR = s.replaceAll('
-', '');
-      const oneLine = noCR.replaceAll('
-', ' ');
-      return '"' + oneLine.replaceAll('"', '""') + '"';
-    };
+  const s = (value ?? '').toString();
+  const noCR = s.replaceAll('\r', '');
+  const oneLine = noCR.replaceAll('\n', ' ');
+  return '"' + oneLine.replaceAll('"', '""') + '"';
+};
 
     const csvRows = [headers.join(';')];
 
