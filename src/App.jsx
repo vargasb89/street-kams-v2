@@ -17,7 +17,7 @@ import {
 
 // --- CONFIGURACIÓN DE FIREBASE E IMPORTACIONES ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   getFirestore,
   addDoc,
@@ -486,6 +486,11 @@ const App = () => {
     photoEvidence: '',
   });
 
+  // Estado para login por email/contraseña
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const campaignsOptions = useMemo(
     () => ['Descuento en Productos', 'Bono Adquisición de Usuarios', 'Coinversión en Markdown', 'Viral Deals'],
     [],
@@ -614,46 +619,71 @@ const App = () => {
     [showStatusModal],
   );
 
+  // Manejo de login con Firebase Auth (email/contraseña)
+  const handleLogin = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!auth) {
+        setError('Auth no está inicializado.');
+        return;
+      }
+      setIsLoggingIn(true);
+      setError(null);
+      try {
+        await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+        showStatusModal('Sesión iniciada correctamente.');
+      } catch (e) {
+        console.error('Error al iniciar sesión:', e);
+        setError('No se pudo iniciar sesión. Verifica tu correo y contraseña.');
+      } finally {
+        setIsLoggingIn(false);
+      }
+    },
+    [auth, loginEmail, loginPassword, showStatusModal],
+  );
+
+  const handleLogout = useCallback(async () => {
+    if (!auth) return;
+    try {
+      await signOut(auth);
+      setUserId(null);
+      setVisits([]);
+      showStatusModal('Sesión cerrada.');
+    } catch (e) {
+      console.error('Error al cerrar sesión:', e);
+      setError('No se pudo cerrar sesión.');
+    }
+  }, [auth, showStatusModal]);
+
   // --- FIREBASE: INICIALIZACIÓN Y AUTENTICACIÓN ---
 
-useEffect(() => {
-  try {
-    const app = initializeApp(firebaseConfig);
-    const authInstance = getAuth(app);
-    const dbInstance = getFirestore(app);
+  useEffect(() => {
+    try {
+      const app = initializeApp(firebaseConfig);
+      const authInstance = getAuth(app);
+      const dbInstance = getFirestore(app);
 
-    setAuth(authInstance);
-    setDb(dbInstance);
+      setAuth(authInstance);
+      setDb(dbInstance);
 
-    const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-      if (user) {
-        // Usuario ya autenticado (anónimo o no)
-        setUserId(user.uid);
+      const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+        if (user) {
+          setUserId(user.uid);
+        } else {
+          setUserId(null);
+        }
         setIsAuthReady(true);
-      } else {
-        // Intentamos autenticación anónima
-        signInAnonymously(authInstance)
-          .then((cred) => {
-            console.log('Autenticado anónimamente:', cred.user.uid);
-            // onAuthStateChanged se disparará de nuevo con el usuario
-          })
-          .catch((e) => {
-            console.error('Error al autenticar anónimamente:', e);
-            setError('No se pudo autenticar en Firebase. Los datos no serán persistentes.');
-            setUserId('Anonimo');
-            setIsAuthReady(true); // No nos quedamos colgados en "Cargando..."
-          });
-      }
-    });
+      });
 
-    return () => unsubscribe();
-  } catch (e) {
-    console.error('Error al inicializar Firebase:', e);
-    setError('La configuración de Firebase no está disponible. Los datos no serán persistentes.');
-  }
-}, []);
+      return () => unsubscribe();
+    } catch (e) {
+      console.error('Error al inicializar Firebase:', e);
+      setError('La configuración de Firebase no está disponible. Los datos no serán persistentes.');
+      setIsAuthReady(true);
+    }
+  }, []);
 
-// --- CARGAR HISTORIAL DE VISITAS ---
+  // --- CARGAR HISTORIAL DE VISITAS ---
 useEffect(() => {
   if (!db || !userId) return;
 
@@ -807,58 +837,118 @@ const exportToCSV = () => {
             </span>
           </div>
         </header>
-
-        {/* 🔍 BLOQUE DE PRUEBA PARA COMPROBAR TAILWIND */}
-        <div className="mb-6 p-4 bg-yellow-100 border-2 border-red-500 rounded-xl shadow-inner">
-          <p className="text-sm font-semibold text-red-700">
-            Bloque DEBUG-TW: si ves fondo amarillo y borde rojo, Tailwind está activo.
-          </p>
-        </div>
-
-        <div className="mb-6 flex space-x-2 p-1 bg-white rounded-xl shadow-inner">
-          <button
-            onClick={() => setCurrentView('form')}
-            className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-              currentView === 'form'
-                ? 'bg-rappi-main text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            Formulario de Check-in
-          </button>
-          <button
-            onClick={() => setCurrentView('history')}
-            className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-              currentView === 'history'
-                ? 'bg-rappi-main text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            Historial de Visitas
-          </button>
-        </div>
-
+        {/* Auth gate + Tabs */}
         {!isAuthReady ? (
           <LoadingState />
+        ) : !userId ? (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <User className="w-5 h-5 mr-2" /> Iniciar sesión
+            </h2>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-rappi-main focus:border-rappi-main"
+                  placeholder="kam@rappi.com"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-rappi-main focus:border-rappi-main"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {error && (
+                <div className="p-2 text-sm bg-red-100 text-red-700 rounded-lg flex items-center">
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full flex items-center justify-center px-6 py-3 bg-rappi-main text-white font-bold text-lg rounded-xl shadow-md hover:bg-rappi-dark transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {isLoggingIn ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <User className="w-5 h-5 mr-2" />}
+                {isLoggingIn ? 'Iniciando sesión...' : 'Entrar'}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                * Activa Email/Password en Firebase Console → Authentication.
+              </p>
+            </form>
+          </div>
         ) : (
-          <div className="mt-4">
-            {currentView === 'form' ? (
-              <FormView
-                form={form}
-                handleSubmit={handleSubmit}
-                handleChange={handleChange}
-                getGeoLocation={getGeoLocation}
-                isCheckingIn={isCheckingIn}
-                location={location}
-                isSubmitting={isSubmitting}
-                error={error}
-                campaignsOptions={campaignsOptions}
-                brandOwnerOptions={brandOwnerOptions}
-                handleCampaignToggle={handleCampaignToggle}
-              />
-            ) : (
-              <HistoryView visits={visits} exportToCSV={exportToCSV} />
-            )}
+          <>
+            <div className="mb-4 flex justify-between items-center">
+              <div className="text-sm text-gray-700">
+                Sesión iniciada como <span className="font-semibold">{userId}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+
+            <div className="mb-6 flex space-x-2 p-1 bg-white rounded-xl shadow-inner">
+              <button
+                onClick={() => setCurrentView('form')}
+                className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
+                  currentView === 'form'
+                    ? 'bg-rappi-main text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Formulario de Check-in
+              </button>
+              <button
+                onClick={() => setCurrentView('history')}
+                className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
+                  currentView === 'history'
+                    ? 'bg-rappi-main text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Historial de Visitas
+              </button>
+            </div>
+
+            <div className="mt-4">
+              {currentView === 'form' ? (
+                <FormView
+                  form={form}
+                  handleSubmit={handleSubmit}
+                  handleChange={handleChange}
+                  getGeoLocation={getGeoLocation}
+                  isCheckingIn={isCheckingIn}
+                  location={location}
+                  isSubmitting={isSubmitting}
+                  error={error}
+                  campaignsOptions={campaignsOptions}
+                  brandOwnerOptions={brandOwnerOptions}
+                  handleCampaignToggle={handleCampaignToggle}
+                />
+              ) : (
+                <HistoryView visits={visits} exportToCSV={exportToCSV} />
+              )}
+            </div>
+          </>
+        )}
           </div>
         )}
       </div>
