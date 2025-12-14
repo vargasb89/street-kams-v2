@@ -715,6 +715,14 @@ const App = () => {
   };
 
   const exportToCSV = () => {
+    // Helper seguro para escapar texto en CSV (comillas dobles y saltos de línea)
+    const csvEscape = (value) => {
+      const s = (value ?? '').toString();
+      return '"' + s.replace(/"/g, '""').replace(/
+?
+/g, ' ') + '"';
+    };
+
     if (visits.length === 0) {
       showStatusModal('No hay datos para exportar.');
       return;
@@ -723,7 +731,6 @@ const App = () => {
     const headers = [
       'ID',
       'KAM ID',
-      'KAM Email',
       'Tipo Visita',
       'Marca ID',
       'Nombre Restaurante',
@@ -747,7 +754,6 @@ const App = () => {
       const row = [
         visit.id,
         visit.kamId || 'N/A',
-        visit.kamEmail || 'N/A',
         visit.visitType || 'N/A',
         visit.brandId,
         visit.restaurantName,
@@ -757,9 +763,7 @@ const App = () => {
         (visit.campaigns || []).join('|'),
         visit.zone,
         visit.outcome,
-        `"${(visit.details || '').replace(/"/g, '""').replace(/
-?
-/g, ' ')}"`,
+        csvEscape(visit.details),
         visit.photoEvidence || 'N/A',
         visit.latitude,
         visit.longitude,
