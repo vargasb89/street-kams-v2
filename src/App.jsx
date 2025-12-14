@@ -769,8 +769,8 @@ const App = () => {
       csvRows.push(row.join(';'));
     });
 
-    const csvString = csvRows.join('
-');
+    const LF = String.fromCharCode(10);
+    const csvString = csvRows.join(LF);
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
