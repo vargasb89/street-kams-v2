@@ -434,7 +434,13 @@ const Modal = ({ message, onClose }) => (
 const App = () => {
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
+
+  // Firebase UID (se usa para rutas/ownership)
   const [userId, setUserId] = useState(null);
+
+  // Email visible (para mostrar en UI)
+  const [userEmail, setUserEmail] = useState('');
+
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [visits, setVisits] = useState([]);
 
@@ -603,6 +609,7 @@ const App = () => {
     try {
       await signOut(auth);
       setUserId(null);
+      setUserEmail('');
       setVisits([]);
       showStatusModal('Sesión cerrada.');
     } catch (e) {
@@ -622,7 +629,9 @@ const App = () => {
       setDb(dbInstance);
 
       const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+        // ✅ UID sigue existiendo (para paths), pero mostramos email en UI
         setUserId(user ? user.uid : null);
+        setUserEmail(user?.email || '');
         setIsAuthReady(true);
       });
 
@@ -684,6 +693,7 @@ const App = () => {
     try {
       const visitData = {
         kamId: userId,
+        kamEmail: userEmail || 'N/A',
         ...form,
         latitude: location?.lat || 'N/A',
         longitude: location?.lon || 'N/A',
@@ -713,6 +723,7 @@ const App = () => {
     const headers = [
       'ID',
       'KAM ID',
+      'KAM Email',
       'Tipo Visita',
       'Marca ID',
       'Nombre Restaurante',
@@ -736,6 +747,7 @@ const App = () => {
       const row = [
         visit.id,
         visit.kamId || 'N/A',
+        visit.kamEmail || 'N/A',
         visit.visitType || 'N/A',
         visit.brandId,
         visit.restaurantName,
@@ -745,7 +757,8 @@ const App = () => {
         (visit.campaigns || []).join('|'),
         visit.zone,
         visit.outcome,
-        `"${(visit.details || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+        `"${(visit.details || '').replace(/"/g, '""').replace(/
+/g, ' ')}"`,
         visit.photoEvidence || 'N/A',
         visit.latitude,
         visit.longitude,
@@ -755,7 +768,8 @@ const App = () => {
       csvRows.push(row.join(';'));
     });
 
-    const csvString = csvRows.join('\n');
+    const csvString = csvRows.join('
+');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -770,28 +784,36 @@ const App = () => {
   const rappiDark = '#D84800';
   const rappiAccent = '#FF7B4D';
 
+  const userLabel = userEmail || userId || '—';
+
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans" style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}>
+    <div
+      className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans"
+      style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}
+    >
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
-        .hover\\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
+        .hover\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
         .text-rappi-main { color: var(--rappi-main); }
-        .focus\\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
-        .focus\\:border-rappi-main:focus { border-color: var(--rappi-main); }
+        .focus\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
+        .focus\:border-rappi-main:focus { border-color: var(--rappi-main); }
         .rappi-header-bg { background: linear-gradient(135deg, var(--rappi-accent), var(--rappi-main)); }
       `}</style>
 
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white" style={{ '--rappi-accent': rappiAccent }}>
+        <header
+          className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white"
+          style={{ '--rappi-accent': rappiAccent }}
+        >
           <h1 className="text-3xl font-extrabold flex items-center drop-shadow-sm">
             Street Kams App <Target className="w-6 h-6 ml-3" />
           </h1>
           <p className="mt-1 text-gray-100 drop-shadow-sm">Registro y Monitoreo de Visitas en Campo (KAM)</p>
           <div className="mt-4 pt-3 border-t border-white border-opacity-30 flex items-center text-sm text-white">
             <User className="w-4 h-4 mr-2" />
-            Usuario ID:{' '}
-            <span className="font-mono bg-white bg-opacity-20 px-2 py-0.5 rounded ml-1 text-xs">{userId || '—'}</span>
+            Usuario:{' '}
+            <span className="font-mono bg-white bg-opacity-20 px-2 py-0.5 rounded ml-1 text-xs">{userLabel}</span>
           </div>
         </header>
 
@@ -842,14 +864,16 @@ const App = () => {
                 {isLoggingIn ? 'Iniciando sesión...' : 'Entrar'}
               </button>
 
-              <p className="text-xs text-gray-500 text-center">* Activa Email/Password en Firebase Console → Authentication.</p>
+              <p className="text-xs text-gray-500 text-center">
+                * Activa Email/Password en Firebase Console → Authentication.
+              </p>
             </form>
           </div>
         ) : (
           <>
             <div className="mb-4 flex justify-between items-center">
               <div className="text-sm text-gray-700">
-                Sesión iniciada como <span className="font-semibold">{userId}</span>
+                Sesión iniciada como <span className="font-semibold">{userLabel}</span>
               </div>
               <button
                 type="button"
@@ -864,7 +888,9 @@ const App = () => {
               <button
                 onClick={() => setCurrentView('form')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'form' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'form'
+                    ? 'bg-rappi-main text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Formulario de Check-in
@@ -872,7 +898,9 @@ const App = () => {
               <button
                 onClick={() => setCurrentView('history')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'history'
+                    ? 'bg-rappi-main text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Historial de Visitas
@@ -908,3 +936,4 @@ const App = () => {
 };
 
 export default App;
+
