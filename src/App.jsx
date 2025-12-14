@@ -18,15 +18,9 @@ import {
 // --- CONFIGURACIÓN DE FIREBASE E IMPORTACIONES ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import {
-  getFirestore,
-  addDoc,
-  collection,
-  query,
-  onSnapshot,
-  serverTimestamp,
-} from 'firebase/firestore';
-// 🔥 FirebaseConfig incrustado solo para el lienzo
+import { getFirestore, addDoc, collection, query, onSnapshot, serverTimestamp } from 'firebase/firestore';
+
+// 🔥 FirebaseConfig (en producción muévelo a variables de entorno)
 const firebaseConfig = {
   apiKey: 'AIzaSyCqHtCOeO5gSuSy5N6qMncplymxJvuoT-s',
   authDomain: 'street-kams-v2.firebaseapp.com',
@@ -37,10 +31,9 @@ const firebaseConfig = {
   measurementId: 'G-P16YRWECY6',
 };
 
-// Habilitar logs de Firebase para depuración (opcional)
-// setLogLevel('debug');
+const APP_ID = 'street-kams-v2';
 
-// --- COMPONENTES UI REUTILIZABLES (MEMOIZADOS PARA EVITAR PERDIDA DE FOCO) ---
+// --- COMPONENTES UI REUTILIZABLES (MEMOIZADOS) ---
 
 const InputField = memo(({ label, name, value, onChange, required = false, placeholder = '', icon = null }) => (
   <div className="flex flex-col">
@@ -58,7 +51,7 @@ const InputField = memo(({ label, name, value, onChange, required = false, place
         placeholder={placeholder}
         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-rappi-main focus:border-rappi-main w-full pr-10"
       />
-      {icon && <div className="absolute right-3 top-1/2 transform -translate-y-1/2">{icon}</div>}
+      {icon && <div className="absolute right-3 top-1/2 -translate-y-1/2">{icon}</div>}
     </div>
   </div>
 ));
@@ -117,8 +110,6 @@ const CampaignSelector = memo(({ options, selected, onToggle }) => (
       {options.map((campaign) => {
         const isSelected = selected.includes(campaign);
         return (
-    
-  
           <button
             key={campaign}
             type="button"
@@ -137,7 +128,7 @@ const CampaignSelector = memo(({ options, selected, onToggle }) => (
   </div>
 ));
 
-// --- COMPONENTES DE VISTA (MOVIDOS FUERA DE App PARA EVITAR RE-MONTAJES Y PERDIDA DE FOCO) ---
+// --- COMPONENTES DE VISTA ---
 
 const LoadingState = () => (
   <div className="flex justify-center items-center p-8 bg-white rounded-xl shadow-lg mt-8">
@@ -165,7 +156,6 @@ const FormView = ({
         <MapPin className="w-5 h-5 mr-2 text-rappi-main" /> Tipo de Visita y Check-in
       </h2>
 
-      {/* Selector de Tipo de Visita */}
       <SelectField
         label="Tipo de Visita"
         name="visitType"
@@ -200,9 +190,7 @@ const FormView = ({
                   Lat: {location.lat.toFixed(6)}, Lon: {location.lon.toFixed(6)}
                 </p>
                 <p
-                  className={`text-xs mt-1 font-semibold ${
-                    location.isSimulated ? 'text-red-500' : 'text-green-600'
-                  }`}
+                  className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}
                 >
                   {location.isSimulated ? 'Simulada' : 'Real'} a las {location.time}
                 </p>
@@ -217,7 +205,6 @@ const FormView = ({
           <h3 className="font-semibold flex items-center text-gray-700">
             <Monitor className="w-4 h-4 mr-2" /> Evidencia Virtual (Obligatoria)
           </h3>
-          {/* Campo de Adjunto Simulado (Texto) */}
           <InputField
             label="Foto de Evidencia (Nombre del archivo o URL)"
             name="photoEvidence"
@@ -247,7 +234,6 @@ const FormView = ({
         <ListOrdered className="w-5 h-5 mr-2 text-rappi-main" /> Detalles Comerciales
       </h2>
 
-      {/* Fila 1: Brand ID y Nombre */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputField
           label="Brand ID (Obligatorio)"
@@ -267,7 +253,6 @@ const FormView = ({
         />
       </div>
 
-      {/* Fila 2: Decision Maker y Brand Owner */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputField
           label="Decision Maker Contactado (Obligatorio)"
@@ -286,7 +271,6 @@ const FormView = ({
         />
       </div>
 
-      {/* Fila 3: Status Ads y Zona */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SelectField
           label="Status Ads"
@@ -306,10 +290,8 @@ const FormView = ({
         />
       </div>
 
-      {/* Fila 4: Tipo de Campaña (Multiselección) */}
       <CampaignSelector options={campaignsOptions} selected={form.campaigns} onToggle={handleCampaignToggle} />
 
-      {/* Fila 5: Resultado de la Visita */}
       <SelectField
         label="Resultado de la Visita (Obligatorio)"
         name="outcome"
@@ -320,7 +302,6 @@ const FormView = ({
         placeholder="Selecciona el resultado"
       />
 
-      {/* Fila 6: Detalles/Pormenores */}
       <TextAreaField
         label="Detalles y Pormenores (Obligatorio)"
         name="details"
@@ -387,9 +368,9 @@ const HistoryView = ({ visits, exportToCSV }) => (
               </p>
               <div
                 className={`px-3 py-1 text-xs font-bold rounded-full ${
-                  visit.outcome.includes('Exitosa')
+                  visit.outcome?.includes('Exitosa')
                     ? 'bg-green-100 text-green-700'
-                    : visit.outcome.includes('Seguimiento')
+                    : visit.outcome?.includes('Seguimiento')
                     ? 'bg-yellow-100 text-yellow-700'
                     : 'bg-red-100 text-red-700'
                 }`}
@@ -406,7 +387,7 @@ const HistoryView = ({ visits, exportToCSV }) => (
                 <span className="font-medium">KAM:</span> {visit.decisionMaker}
               </p>
               <p>
-                <span className="font-medium">Campañas:</span> {visit.campaigns.join(', ')}
+                <span className="font-medium">Campañas:</span> {(visit.campaigns || []).join(', ')}
               </p>
               <p className="text-xs text-gray-500 flex items-center">
                 <Clock className="w-3 h-3 mr-1" />
@@ -434,7 +415,6 @@ const HistoryView = ({ visits, exportToCSV }) => (
   </div>
 );
 
-// --- MODAL SIMPLE (POR SI NO LO TENÍAS DEFINIDO) ---
 const Modal = ({ message, onClose }) => (
   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
     <div className="bg-white rounded-xl shadow-lg p-4 max-w-sm w-full flex items-start">
@@ -451,27 +431,21 @@ const Modal = ({ message, onClose }) => (
   </div>
 );
 
-// --- COMPONENTE PRINCIPAL ---
-
-const APP_ID = 'street-kams-v2';
-
 const App = () => {
-  // --- ESTADO DE LA APLICACIÓN ---
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
   const [userId, setUserId] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [visits, setVisits] = useState([]);
 
-  const [currentView, setCurrentView] = useState('form'); // 'form' | 'history'
+  const [currentView, setCurrentView] = useState('form');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
-  const [location, setLocation] = useState(null); // { lat, lon, time }
+  const [location, setLocation] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [error, setError] = useState(null);
 
-  // Estado del formulario de visita
   const [form, setForm] = useState({
     visitType: 'Presencial',
     brandId: '',
@@ -486,7 +460,6 @@ const App = () => {
     photoEvidence: '',
   });
 
-  // Estado para login por email/contraseña
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -506,8 +479,6 @@ const App = () => {
     ],
     [],
   );
-
-  // --- FUNCIONES DE UTILIDAD ---
 
   const showStatusModal = useCallback((message) => {
     setModalMessage(message);
@@ -538,10 +509,7 @@ const App = () => {
     setIsCheckingIn(true);
     setLocation(null);
 
-    const simulatedLocation = {
-      latitude: 4.629199,
-      longitude: -74.15403,
-    };
+    const simulatedLocation = { latitude: 4.629199, longitude: -74.15403 };
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -581,18 +549,13 @@ const App = () => {
 
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
-    setForm((prevForm) => {
-      const newForm = { ...prevForm, [name]: value };
-
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
       if (name === 'visitType') {
-        if (value === 'Virtual') {
-          setLocation(null);
-          newForm.photoEvidence = '';
-        } else {
-          newForm.photoEvidence = '';
-        }
+        if (value === 'Virtual') setLocation(null);
+        next.photoEvidence = '';
       }
-      return newForm;
+      return next;
     });
   }, []);
 
@@ -601,16 +564,10 @@ const App = () => {
       setForm((prevForm) => {
         const currentCampaigns = prevForm.campaigns;
         if (currentCampaigns.includes(campaign)) {
-          return {
-            ...prevForm,
-            campaigns: currentCampaigns.filter((c) => c !== campaign),
-          };
+          return { ...prevForm, campaigns: currentCampaigns.filter((c) => c !== campaign) };
         }
         if (currentCampaigns.length < 2) {
-          return {
-            ...prevForm,
-            campaigns: [...currentCampaigns, campaign],
-          };
+          return { ...prevForm, campaigns: [...currentCampaigns, campaign] };
         }
         showStatusModal('Solo puedes seleccionar un máximo de 2 tipos de campaña.');
         return prevForm;
@@ -619,7 +576,6 @@ const App = () => {
     [showStatusModal],
   );
 
-  // Manejo de login con Firebase Auth (email/contraseña)
   const handleLogin = useCallback(
     async (e) => {
       e.preventDefault();
@@ -655,8 +611,7 @@ const App = () => {
     }
   }, [auth, showStatusModal]);
 
-  // --- FIREBASE: INICIALIZACIÓN Y AUTENTICACIÓN ---
-
+  // --- INIT FIREBASE ---
   useEffect(() => {
     try {
       const app = initializeApp(firebaseConfig);
@@ -667,11 +622,7 @@ const App = () => {
       setDb(dbInstance);
 
       const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-        if (user) {
-          setUserId(user.uid);
-        } else {
-          setUserId(null);
-        }
+        setUserId(user ? user.uid : null);
         setIsAuthReady(true);
       });
 
@@ -683,54 +634,77 @@ const App = () => {
     }
   }, []);
 
-  // --- CARGAR HISTORIAL DE VISITAS ---
-useEffect(() => {
-  if (!db || !userId) return;
-
-  const collectionPath = `artifacts/${APP_ID}/users/${userId}/kams_visits`;
-  const q = query(collection(db, collectionPath));
-
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    setVisits(data);
-  });
-
-  return () => unsubscribe();
-}, [db, userId]);
-
-// --- MANEJO DE SUBMIT ---
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  setError(null);
-
-  try {
-    const visitData = {
-      kamId: userId,
-      ...form,
-      latitude: location?.lat || 'N/A',
-      longitude: location?.lon || 'N/A',
-      locationSimulated: location?.isSimulated || false,
-      checkInTime: serverTimestamp(),
-    };
+  // --- LISTENER VISITS ---
+  useEffect(() => {
+    if (!db || !userId) return;
 
     const collectionPath = `artifacts/${APP_ID}/users/${userId}/kams_visits`;
+    const q = query(collection(db, collectionPath));
 
-    await addDoc(collection(db, collectionPath), visitData);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Orden más reciente primero (si existe checkInTime)
+        data.sort((a, b) => (b.checkInTime?.toDate?.() || 0) - (a.checkInTime?.toDate?.() || 0));
+        setVisits(data);
+      },
+      (e) => {
+        console.error('Error al cargar visitas:', e);
+        setError('Error al cargar el historial de visitas.');
+      },
+    );
 
-    showStatusModal('✅ Visita registrada con éxito en Firestore.');
-    resetForm();
-  } catch (e) {
-    console.error('Error al guardar en Firestore:', e);
-    setError('Error al guardar la visita. Inténtalo de nuevo.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    return () => unsubscribe();
+  }, [db, userId]);
 
-// --- EXPORTACIÓN A CSV ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-const exportToCSV = () => {
+    if (form.visitType === 'Presencial' && !location) {
+      showStatusModal('Para una visita Presencial, por favor realiza el "Check-in" de ubicación.');
+      return;
+    }
+    if (form.visitType === 'Virtual' && !form.photoEvidence.trim()) {
+      showStatusModal('Para una visita Virtual, es obligatorio adjuntar la evidencia (nombre/URL).');
+      return;
+    }
+    if (form.campaigns.length === 0) {
+      showStatusModal('Debes seleccionar al menos un Tipo de Campaña.');
+      return;
+    }
+    if (!db || !userId) {
+      setError('Debes iniciar sesión para registrar visitas.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const visitData = {
+        kamId: userId,
+        ...form,
+        latitude: location?.lat || 'N/A',
+        longitude: location?.lon || 'N/A',
+        locationSimulated: location?.isSimulated || false,
+        checkInTime: serverTimestamp(),
+      };
+
+      const collectionPath = `artifacts/${APP_ID}/users/${userId}/kams_visits`;
+      await addDoc(collection(db, collectionPath), visitData);
+
+      showStatusModal('✅ Visita registrada con éxito en Firestore.');
+      resetForm();
+    } catch (e) {
+      console.error('Error al guardar en Firestore:', e);
+      setError('Error al guardar la visita. Inténtalo de nuevo.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const exportToCSV = () => {
     if (visits.length === 0) {
       showStatusModal('No hay datos para exportar.');
       return;
@@ -756,8 +730,7 @@ const exportToCSV = () => {
       'Timestamp',
     ];
 
-    const csvRows = [];
-    csvRows.push(headers.join(';'));
+    const csvRows = [headers.join(';')];
 
     visits.forEach((visit) => {
       const row = [
@@ -769,7 +742,7 @@ const exportToCSV = () => {
         visit.decisionMaker,
         visit.brandOwner,
         visit.seaAds,
-        visit.campaigns.join('|'),
+        (visit.campaigns || []).join('|'),
         visit.zone,
         visit.outcome,
         `"${(visit.details || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
@@ -793,51 +766,35 @@ const exportToCSV = () => {
     showStatusModal('📥 Datos exportados correctamente a CSV.');
   };
 
-  // --- RENDERIZADO PRINCIPAL ---
-
   const rappiMain = '#FF5500';
   const rappiDark = '#D84800';
   const rappiAccent = '#FF7B4D';
 
   return (
-    <div
-      className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans"
-      style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}
-    >
-      <style>
-        {`
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans" style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}>
+      <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
         .hover\\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
         .text-rappi-main { color: var(--rappi-main); }
         .focus\\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
         .focus\\:border-rappi-main:focus { border-color: var(--rappi-main); }
-        .rappi-header-bg {
-          background: linear-gradient(135deg, var(--rappi-accent), var(--rappi-main));
-        }
-      `}
-      </style>
+        .rappi-header-bg { background: linear-gradient(135deg, var(--rappi-accent), var(--rappi-main)); }
+      `}</style>
 
       <div className="max-w-4xl mx-auto">
-        <header
-          className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white"
-          style={{ '--rappi-accent': rappiAccent }}
-        >
+        <header className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white" style={{ '--rappi-accent': rappiAccent }}>
           <h1 className="text-3xl font-extrabold flex items-center drop-shadow-sm">
             Street Kams App <Target className="w-6 h-6 ml-3" />
           </h1>
-          <p className="mt-1 text-gray-100 drop-shadow-sm">
-            Registro y Monitoreo de Visitas en Campo (KAM)
-          </p>
+          <p className="mt-1 text-gray-100 drop-shadow-sm">Registro y Monitoreo de Visitas en Campo (KAM)</p>
           <div className="mt-4 pt-3 border-t border-white border-opacity-30 flex items-center text-sm text-white">
             <User className="w-4 h-4 mr-2" />
             Usuario ID:{' '}
-            <span className="font-mono bg-white bg-opacity-20 px-2 py-0.5 rounded ml-1 text-xs">
-              {userId || 'Cargando...'}
-            </span>
+            <span className="font-mono bg-white bg-opacity-20 px-2 py-0.5 rounded ml-1 text-xs">{userId || '—'}</span>
           </div>
         </header>
-        {/* Auth gate + Tabs */}
+
         {!isAuthReady ? (
           <LoadingState />
         ) : !userId ? (
@@ -885,9 +842,7 @@ const exportToCSV = () => {
                 {isLoggingIn ? 'Iniciando sesión...' : 'Entrar'}
               </button>
 
-              <p className="text-xs text-gray-500 text-center">
-                * Activa Email/Password en Firebase Console → Authentication.
-              </p>
+              <p className="text-xs text-gray-500 text-center">* Activa Email/Password en Firebase Console → Authentication.</p>
             </form>
           </div>
         ) : (
@@ -909,9 +864,7 @@ const exportToCSV = () => {
               <button
                 onClick={() => setCurrentView('form')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'form'
-                    ? 'bg-rappi-main text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'form' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Formulario de Check-in
@@ -919,9 +872,7 @@ const exportToCSV = () => {
               <button
                 onClick={() => setCurrentView('history')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'history'
-                    ? 'bg-rappi-main text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Historial de Visitas
@@ -948,8 +899,6 @@ const exportToCSV = () => {
               )}
             </div>
           </>
-        )}
-          </div>
         )}
       </div>
 
