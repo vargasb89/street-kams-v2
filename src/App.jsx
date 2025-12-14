@@ -717,10 +717,14 @@ const App = () => {
   const exportToCSV = () => {
     // Helper seguro para escapar texto en CSV (comillas dobles y saltos de línea)
     const csvEscape = (value) => {
+      // Evitamos regex (a veces se rompen al copiar/pegar en Windows → Vercel/esbuild)
       const s = (value ?? '').toString();
-      return '"' + s.replace(/"/g, '""').replace(/
-?
-/g, ' ') + '"';
+      const noReturns = s.split('
+').join('');
+      const oneLine = noReturns.split('
+').join(' ');
+      const escapedQuotes = oneLine.split('"').join('""');
+      return '"' + escapedQuotes + '"';
     };
 
     if (visits.length === 0) {
