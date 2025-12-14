@@ -189,9 +189,7 @@ const FormView = ({
                 <p className="text-xs text-gray-500">
                   Lat: {location.lat.toFixed(6)}, Lon: {location.lon.toFixed(6)}
                 </p>
-                <p
-                  className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}
-                >
+                <p className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}>
                   {location.isSimulated ? 'Simulada' : 'Real'} a las {location.time}
                 </p>
               </div>
@@ -215,8 +213,7 @@ const FormView = ({
             icon={<Camera className="w-4 h-4 text-gray-500" />}
           />
           <p className="text-xs text-gray-500 mt-1">
-            Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A' si no se realiza el
-            check-in.
+            Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A' si no se realiza el check-in.
           </p>
         </div>
       )}
@@ -629,7 +626,6 @@ const App = () => {
       setDb(dbInstance);
 
       const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-        // ✅ UID sigue existiendo (para paths), pero mostramos email en UI
         setUserId(user ? user.uid : null);
         setUserEmail(user?.email || '');
         setIsAuthReady(true);
@@ -654,7 +650,6 @@ const App = () => {
       q,
       (snapshot) => {
         const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Orden más reciente primero (si existe checkInTime)
         data.sort((a, b) => (b.checkInTime?.toDate?.() || 0) - (a.checkInTime?.toDate?.() || 0));
         setVisits(data);
       },
@@ -714,19 +709,8 @@ const App = () => {
     }
   };
 
+  // ✅ EXPORT CSV (FIX)
   const exportToCSV = () => {
-    // Helper seguro para escapar texto en CSV (comillas dobles y saltos de línea)
-    const csvEscape = (value) => {
-      // Evitamos regex (a veces se rompen al copiar/pegar en Windows → Vercel/esbuild)
-      const s = (value ?? '').toString();
-      const noReturns = s.split('
-').join('');
-      const oneLine = noReturns.split('
-').join(' ');
-      const escapedQuotes = oneLine.split('"').join('""');
-      return '"' + escapedQuotes + '"';
-    };
-
     if (visits.length === 0) {
       showStatusModal('No hay datos para exportar.');
       return;
@@ -752,6 +736,14 @@ const App = () => {
       'Timestamp',
     ];
 
+    // ✅ Sin regex – build safe
+    const csvEscape = (value) => {
+      const s = (value ?? '').toString();
+      const noCR = s.replaceAll('\r', '');
+      const oneLine = noCR.replaceAll('\n', ' ');
+      return '"' + oneLine.replaceAll('"', '""') + '"';
+    };
+
     const csvRows = [headers.join(';')];
 
     visits.forEach((visit) => {
@@ -767,7 +759,7 @@ const App = () => {
         (visit.campaigns || []).join('|'),
         visit.zone,
         visit.outcome,
-        csvEscape(visit.details),
+        csvEscape(visit.details || ''),
         visit.photoEvidence || 'N/A',
         visit.latitude,
         visit.longitude,
@@ -777,8 +769,7 @@ const App = () => {
       csvRows.push(row.join(';'));
     });
 
-    const csvString = csvRows.join('
-');
+    const csvString = csvRows.join('\n');
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -796,17 +787,14 @@ const App = () => {
   const userLabel = userEmail || userId || '—';
 
   return (
-    <div
-      className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans"
-      style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}
-    >
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans" style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}>
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
-        .hover\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
+        .hover\\:bg-rappi-dark:hover { background-color: var(--rappi-dark); }
         .text-rappi-main { color: var(--rappi-main); }
-        .focus\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
-        .focus\:border-rappi-main:focus { border-color: var(--rappi-main); }
+        .focus\\:ring-rappi-main:focus { --tw-ring-color: var(--rappi-main); }
+        .focus\\:border-rappi-main:focus { border-color: var(--rappi-main); }
         .rappi-header-bg { background: linear-gradient(135deg, var(--rappi-accent), var(--rappi-main)); }
       `}</style>
 
@@ -873,9 +861,7 @@ const App = () => {
                 {isLoggingIn ? 'Iniciando sesión...' : 'Entrar'}
               </button>
 
-              <p className="text-xs text-gray-500 text-center">
-                * Activa Email/Password en Firebase Console → Authentication.
-              </p>
+              <p className="text-xs text-gray-500 text-center">* Activa Email/Password en Firebase Console → Authentication.</p>
             </form>
           </div>
         ) : (
@@ -945,3 +931,4 @@ const App = () => {
 };
 
 export default App;
+
