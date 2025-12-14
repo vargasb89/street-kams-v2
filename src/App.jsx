@@ -758,6 +758,7 @@ const App = () => {
         visit.zone,
         visit.outcome,
         `"${(visit.details || '').replace(/"/g, '""').replace(/
+?
 /g, ' ')}"`,
         visit.photoEvidence || 'N/A',
         visit.latitude,
@@ -936,4 +937,3 @@ const App = () => {
 };
 
 export default App;
-
