@@ -33,6 +33,12 @@ const firebaseConfig = {
 
 const APP_ID = 'street-kams-v2';
 
+// ---------------------------------------------------------------------------
+// ✅ FIX LOGO (TU CASO)
+// Archivo en: public/rappi-logo-512.png
+// Ruta en React:  /rappi-logo-512.png
+// ---------------------------------------------------------------------------
+
 // --- COMPONENTES UI REUTILIZABLES (MEMOIZADOS) ---
 
 const InputField = memo(
@@ -198,9 +204,7 @@ const FormView = ({
                   <p className="text-xs text-gray-500">
                     Lat: {location.lat.toFixed(6)}, Lon: {location.lon.toFixed(6)}
                   </p>
-                  <p
-                    className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}
-                  >
+                  <p className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}>
                     {location.isSimulated ? 'Simulada' : 'Real'} a las {location.time}
                   </p>
                 </div>
@@ -618,8 +622,8 @@ const App = () => {
 
   const zoneOptions = useMemo(() => ['Kennedy', 'Antonio Nariño', 'Suba', 'Engativá', 'Fontibon'], []);
 
-  // ✅ Logo: evita “imagen rota” y mantiene look
-  const [logoSrc, setLogoSrc] = useState('/rappi-logo.svg');
+  // ✅ Logo desde /public
+  const [logoSrc, setLogoSrc] = useState('/rappi-logo-512.png');
 
   const showStatusModal = useCallback((message) => {
     setModalMessage(message);
@@ -940,10 +944,7 @@ const App = () => {
   const userLabel = userEmail || userId || '—';
 
   return (
-    <div
-      className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans"
-      style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}
-    >
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans" style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}>
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
@@ -960,7 +961,6 @@ const App = () => {
           style={{ '--rappi-accent': rappiAccent }}
         >
           <div className="flex items-center gap-4">
-            {/* ✅ Logo corregido (SVG en /public/rappi-logo.svg). Fallback: /rappi-logo.png */}
             <div className="w-24 h-24 flex items-center justify-center rounded-3xl bg-white/20 backdrop-blur shadow-inner overflow-hidden">
               <img
                 src={logoSrc}
@@ -968,7 +968,8 @@ const App = () => {
                 className="w-full h-full object-contain p-4 select-none"
                 draggable={false}
                 onError={() => {
-                  if (logoSrc !== '/rappi-logo.png') setLogoSrc('/rappi-logo.png');
+                  // Fallback simple si el png no carga
+                  if (logoSrc !== '/vite.svg') setLogoSrc('/vite.svg');
                 }}
               />
             </div>
