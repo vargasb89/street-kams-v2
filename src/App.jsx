@@ -35,26 +35,39 @@ const APP_ID = 'street-kams-v2';
 
 // --- COMPONENTES UI REUTILIZABLES (MEMOIZADOS) ---
 
-const InputField = memo(({ label, name, value, onChange, required = false, placeholder = '', icon = null }) => (
-  <div className="flex flex-col">
-    <label htmlFor={name} className="text-sm font-medium text-gray-700 mb-1">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <div className="relative flex items-center">
-      <input
-        type="text"
-        id={name}
-        name={name}
-        value={value}
-        onChange={onChange}
-        required={required}
-        placeholder={placeholder}
-        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-rappi-main focus:border-rappi-main w-full pr-10"
-      />
-      {icon && <div className="absolute right-3 top-1/2 -translate-y-1/2">{icon}</div>}
+const InputField = memo(
+  ({
+    label,
+    name,
+    value,
+    onChange,
+    required = false,
+    placeholder = '',
+    icon = null,
+    type = 'text',
+    inputMode,
+  }) => (
+    <div className="flex flex-col">
+      <label htmlFor={name} className="text-sm font-medium text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <div className="relative flex items-center">
+        <input
+          type={type}
+          inputMode={inputMode}
+          id={name}
+          name={name}
+          value={value}
+          onChange={onChange}
+          required={required}
+          placeholder={placeholder}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-rappi-main focus:border-rappi-main w-full pr-10"
+        />
+        {icon && <div className="absolute right-3 top-1/2 -translate-y-1/2">{icon}</div>}
+      </div>
     </div>
-  </div>
-));
+  ),
+);
 
 const SelectField = memo(
   ({ label, name, value, onChange, options, required = false, placeholder = 'Selecciona una opción' }) => (
@@ -101,33 +114,6 @@ const TextAreaField = memo(({ label, name, value, onChange, required = false, pl
   </div>
 ));
 
-const CampaignSelector = memo(({ options, selected, onToggle }) => (
-  <div>
-    <label className="text-sm font-medium text-gray-700 mb-2 block">
-      Tipo de Campaña (Máx. 2, Obligatorio) <span className="text-red-500">*</span>
-    </label>
-    <div className="flex flex-wrap gap-2">
-      {options.map((campaign) => {
-        const isSelected = selected.includes(campaign);
-        return (
-          <button
-            key={campaign}
-            type="button"
-            onClick={() => onToggle(campaign)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-full transition duration-150 border ${
-              isSelected
-                ? 'bg-rappi-main text-white border-rappi-main shadow-md hover:bg-rappi-dark'
-                : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-            }`}
-          >
-            {campaign}
-          </button>
-        );
-      })}
-    </div>
-  </div>
-));
-
 // --- COMPONENTES DE VISTA ---
 
 const LoadingState = () => (
@@ -136,6 +122,13 @@ const LoadingState = () => (
     <p className="text-lg text-gray-700">Cargando aplicación y autenticando usuario...</p>
   </div>
 );
+
+const SectionTitle = memo(({ icon, title }) => (
+  <h2 className="text-xl font-bold text-gray-800 flex items-center mb-4">
+    {icon}
+    {title}
+  </h2>
+));
 
 const FormView = ({
   form,
@@ -146,190 +139,304 @@ const FormView = ({
   location,
   isSubmitting,
   error,
-  campaignsOptions,
-  brandOwnerOptions,
-  handleCampaignToggle,
-}) => (
-  <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 bg-white rounded-lg shadow-xl">
-    <section className="border-b pb-4">
-      <h2 className="text-xl font-bold text-gray-800 flex items-center mb-4">
-        <MapPin className="w-5 h-5 mr-2 text-rappi-main" /> Tipo de Visita y Check-in
-      </h2>
+  zoneOptions,
+}) => {
+  const catalogStatusOptions = useMemo(() => ['Ok', 'En proceso', 'Sin Revisión', 'Blocker'], []);
+  const mdStatusOptions = useMemo(() => ['Ok', 'En proceso', 'Sin Revisión', 'Blocker'], []);
+  const topOperatorLevelOptions = useMemo(() => ['Top Oro', 'Top Plata', 'Top Básico', 'Alerta'], []);
+  const okImproveOptions = useMemo(() => ['Ok', 'Por Mejorar'], []);
+  const yesNoOptions = useMemo(() => ['Si', 'No'], []);
+  const adsOptions = useMemo(() => ['Si', 'Upselling', 'Negociando', 'No'], []);
 
-      <SelectField
-        label="Tipo de Visita"
-        name="visitType"
-        value={form.visitType}
-        onChange={handleChange}
-        options={['Presencial', 'Virtual']}
-        required
-      />
+  return (
+    <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 bg-white rounded-lg shadow-xl">
+      <section className="border-b pb-4">
+        <SectionTitle
+          icon={<MapPin className="w-5 h-5 mr-2 text-rappi-main" />}
+          title="Información General"
+        />
 
-      {form.visitType === 'Presencial' && (
-        <div className="mt-4 p-4 border border-gray-200 rounded-lg space-y-3">
-          <h3 className="font-semibold flex items-center text-gray-700">
-            <MapPin className="w-4 h-4 mr-2" /> Check-in (Obligatorio)
-          </h3>
-          <div className="flex flex-col md:flex-row gap-4">
-            <button
-              type="button"
-              onClick={getGeoLocation}
-              disabled={isCheckingIn || !!location || isSubmitting}
-              className={`flex-1 flex items-center justify-center px-4 py-3 text-white font-semibold rounded-lg transition duration-200 ${
-                location ? 'bg-green-600 hover:bg-green-700' : 'bg-rappi-main hover:bg-rappi-dark'
-              } disabled:bg-gray-400`}
-            >
-              {isCheckingIn && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {location ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <MapPin className="w-4 h-4 mr-2" />}
-              {location ? 'Ubicación Registrada' : 'Realizar Check-in'}
-            </button>
-            {location && (
-              <div className="flex-1 bg-gray-50 p-3 rounded-lg border border-gray-200 text-sm">
-                <p className="font-medium text-gray-700">Coordenadas:</p>
-                <p className="text-xs text-gray-500">
-                  Lat: {location.lat.toFixed(6)}, Lon: {location.lon.toFixed(6)}
-                </p>
-                <p className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}>
-                  {location.isSimulated ? 'Simulada' : 'Real'} a las {location.time}
-                </p>
-              </div>
-            )}
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="Tipo de Visita"
+            name="visitType"
+            value={form.visitType}
+            onChange={handleChange}
+            options={['Presencial', 'Virtual']}
+            required
+          />
+
+          <SelectField
+            label="Zona"
+            name="zone"
+            value={form.zone}
+            onChange={handleChange}
+            options={zoneOptions}
+            required
+            placeholder="Selecciona la zona"
+          />
         </div>
-      )}
 
-      {form.visitType === 'Virtual' && (
-        <div className="mt-4 p-4 border border-gray-200 rounded-lg space-y-3">
-          <h3 className="font-semibold flex items-center text-gray-700">
-            <Monitor className="w-4 h-4 mr-2" /> Evidencia Virtual (Obligatoria)
-          </h3>
+        {form.visitType === 'Presencial' && (
+          <div className="mt-4 p-4 border border-gray-200 rounded-lg space-y-3">
+            <h3 className="font-semibold flex items-center text-gray-700">
+              <MapPin className="w-4 h-4 mr-2" /> Check-in (Obligatorio)
+            </h3>
+            <div className="flex flex-col md:flex-row gap-4">
+              <button
+                type="button"
+                onClick={getGeoLocation}
+                disabled={isCheckingIn || !!location || isSubmitting}
+                className={`flex-1 flex items-center justify-center px-4 py-3 text-white font-semibold rounded-lg transition duration-200 ${
+                  location ? 'bg-green-600 hover:bg-green-700' : 'bg-rappi-main hover:bg-rappi-dark'
+                } disabled:bg-gray-400`}
+              >
+                {isCheckingIn && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {location ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <MapPin className="w-4 h-4 mr-2" />}
+                {location ? 'Ubicación Registrada' : 'Realizar Check-in'}
+              </button>
+              {location && (
+                <div className="flex-1 bg-gray-50 p-3 rounded-lg border border-gray-200 text-sm">
+                  <p className="font-medium text-gray-700">Coordenadas:</p>
+                  <p className="text-xs text-gray-500">
+                    Lat: {location.lat.toFixed(6)}, Lon: {location.lon.toFixed(6)}
+                  </p>
+                  <p className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}>
+                    {location.isSimulated ? 'Simulada' : 'Real'} a las {location.time}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {form.visitType === 'Virtual' && (
+          <div className="mt-4 p-4 border border-gray-200 rounded-lg space-y-3">
+            <h3 className="font-semibold flex items-center text-gray-700">
+              <Monitor className="w-4 h-4 mr-2" /> Evidencia Virtual (Obligatoria)
+            </h3>
+            <InputField
+              label="Foto de Evidencia (Nombre del archivo o URL)"
+              name="photoEvidence"
+              value={form.photoEvidence}
+              onChange={handleChange}
+              required
+              placeholder="Ej: captura-meeting-zoom.png o enlace a la foto"
+              icon={<Camera className="w-4 h-4 text-gray-500" />}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A' si no se realiza el check-in.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 p-2 text-sm bg-red-100 text-red-700 rounded-lg flex items-center">
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            {error}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <SectionTitle
+          icon={<ListOrdered className="w-5 h-5 mr-2 text-rappi-main" />}
+          title="Restaurante"
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <InputField
-            label="Foto de Evidencia (Nombre del archivo o URL)"
-            name="photoEvidence"
-            value={form.photoEvidence}
+            label="Brand ID (Obligatorio)"
+            name="brandId"
+            value={form.brandId}
             onChange={handleChange}
             required
-            placeholder="Ej: captura-meeting-zoom.png o enlace a la foto"
-            icon={<Camera className="w-4 h-4 text-gray-500" />}
+            placeholder="Ej: 123456"
+            inputMode="numeric"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A' si no se realiza el check-in.
-          </p>
+          <InputField
+            label="Nombre del Restaurante (Obligatorio)"
+            name="restaurantName"
+            value={form.restaurantName}
+            onChange={handleChange}
+            required
+            placeholder="Ej: El Corral"
+          />
         </div>
-      )}
 
-      {error && (
-        <div className="mt-3 p-2 text-sm bg-red-100 text-red-700 rounded-lg flex items-center">
-          <AlertTriangle className="w-4 h-4 mr-2" />
-          {error}
-        </div>
-      )}
-    </section>
-
-    <section className="space-y-4">
-      <h2 className="text-xl font-bold text-gray-800 flex items-center">
-        <ListOrdered className="w-5 h-5 mr-2 text-rappi-main" /> Detalles Comerciales
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputField
-          label="Brand ID (Obligatorio)"
-          name="brandId"
-          value={form.brandId}
-          onChange={handleChange}
-          required
-          placeholder="Ej: 123456"
-        />
-        <InputField
-          label="Nombre del Restaurante (Obligatorio)"
-          name="restaurantName"
-          value={form.restaurantName}
-          onChange={handleChange}
-          required
-          placeholder="Ej: El Corral"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <InputField
-          label="Decision Maker Contactado (Obligatorio)"
+          label="Decision Maker (Nombre y Rol) (Obligatorio)"
           name="decisionMaker"
           value={form.decisionMaker}
           onChange={handleChange}
           required
           placeholder="Ej: Juan Pérez - Gerente de Marketing"
         />
-        <SelectField
-          label="Brand Owner"
-          name="brandOwner"
-          value={form.brandOwner}
+      </section>
+
+      <section className="space-y-4 border-t pt-6">
+        <SectionTitle icon={<Camera className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 1: Catálogo" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="Fotos"
+            name="catalogPhotos"
+            value={form.catalogPhotos}
+            onChange={handleChange}
+            options={catalogStatusOptions}
+            required
+          />
+          <SelectField
+            label="Descripciones"
+            name="catalogDescriptions"
+            value={form.catalogDescriptions}
+            onChange={handleChange}
+            options={catalogStatusOptions}
+            required
+          />
+          <SelectField
+            label="Estructura Menú / Toppings"
+            name="catalogMenuStructure"
+            value={form.catalogMenuStructure}
+            onChange={handleChange}
+            options={catalogStatusOptions}
+            required
+          />
+          <InputField
+            label="Price Parity (Respuesta numérica)"
+            name="priceParity"
+            value={form.priceParity}
+            onChange={handleChange}
+            required
+            type="number"
+            inputMode="decimal"
+            placeholder="Ej: 0 / 5 / 10"
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t pt-6">
+        <SectionTitle icon={<Monitor className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 2: Markdown" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="MD (Menú Digital Estándar)"
+            name="mdStandard"
+            value={form.mdStandard}
+            onChange={handleChange}
+            options={mdStatusOptions}
+            required
+          />
+          <SelectField
+            label="MD PRO (Menú Digital Pro)"
+            name="mdPro"
+            value={form.mdPro}
+            onChange={handleChange}
+            options={mdStatusOptions}
+            required
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t pt-6">
+        <SectionTitle icon={<Target className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 3: Top Operator" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="Level"
+            name="topOperatorLevel"
+            value={form.topOperatorLevel}
+            onChange={handleChange}
+            options={topOperatorLevelOptions}
+            required
+          />
+          <SelectField
+            label="Defect"
+            name="topOperatorDefect"
+            value={form.topOperatorDefect}
+            onChange={handleChange}
+            options={okImproveOptions}
+            required
+          />
+          <SelectField
+            label="Cancel"
+            name="topOperatorCancel"
+            value={form.topOperatorCancel}
+            onChange={handleChange}
+            options={okImproveOptions}
+            required
+          />
+          <SelectField
+            label="Availability (Disponibilidad)"
+            name="topOperatorAvailability"
+            value={form.topOperatorAvailability}
+            onChange={handleChange}
+            options={okImproveOptions}
+            required
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t pt-6">
+        <SectionTitle icon={<Send className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 4: Growth" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectField
+            label="Viral Deals"
+            name="growthViralDeals"
+            value={form.growthViralDeals}
+            onChange={handleChange}
+            options={yesNoOptions}
+            required
+          />
+          <SelectField
+            label="Ads (Publicidad)"
+            name="growthAds"
+            value={form.growthAds}
+            onChange={handleChange}
+            options={adsOptions}
+            required
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4 border-t pt-6">
+        <SectionTitle icon={<ListOrdered className="w-5 h-5 mr-2 text-rappi-main" />} title="Detalle y Pormenores" />
+
+        <TextAreaField
+          label="Detalles y Pormenores (Obligatorio)"
+          name="details"
+          value={form.details}
           onChange={handleChange}
-          options={brandOwnerOptions}
+          required
+          placeholder="Ej: Observaciones, acuerdos, blockers, próximos pasos..."
         />
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SelectField
-          label="Status Ads"
-          name="seaAds"
-          value={form.seaAds}
-          onChange={handleChange}
-          options={['New', 'Upselling', 'Blockers', 'N/A']}
-          placeholder="Selecciona el estatus"
-        />
-        <SelectField
-          label="Zona de Operación"
-          name="zone"
-          value={form.zone}
-          onChange={handleChange}
-          options={['Kennedy', 'Antonio Nariño', 'Suba', 'Engativá', 'Fontibon']}
-          placeholder="Selecciona la zona"
-        />
-      </div>
+      <button
+        type="submit"
+        disabled={
+          isSubmitting ||
+          !form.brandId ||
+          !form.restaurantName ||
+          !form.decisionMaker ||
+          !form.zone ||
+          !form.details ||
+          (form.visitType === 'Presencial' && !location) ||
+          (form.visitType === 'Virtual' && !form.photoEvidence.trim())
+        }
+        className="w-full flex items-center justify-center px-6 py-3 bg-rappi-main text-white font-bold text-lg rounded-xl shadow-md hover:bg-rappi-dark transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
+      >
+        {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
+        {isSubmitting ? 'Enviando...' : 'Registrar Visita'}
+      </button>
 
-      <CampaignSelector options={campaignsOptions} selected={form.campaigns} onToggle={handleCampaignToggle} />
-
-      <SelectField
-        label="Resultado de la Visita (Obligatorio)"
-        name="outcome"
-        value={form.outcome}
-        onChange={handleChange}
-        required
-        options={['Cerrada/Exitosa', 'Seguimiento (Próx. semana)', 'Bloqueo/Rechazo', 'Cita Programada']}
-        placeholder="Selecciona el resultado"
-      />
-
-      <TextAreaField
-        label="Detalles y Pormenores (Obligatorio)"
-        name="details"
-        value={form.details}
-        onChange={handleChange}
-        required
-        placeholder="Ej: Se acordó lanzar la promo X el día Y. El bloqueo es por falta de stock."
-      />
-    </section>
-
-    <button
-      type="submit"
-      disabled={
-        isSubmitting ||
-        (form.visitType === 'Presencial' && !location) ||
-        (form.visitType === 'Virtual' && !form.photoEvidence.trim()) ||
-        !form.brandId ||
-        !form.outcome ||
-        form.campaigns.length === 0
-      }
-      className="w-full flex items-center justify-center px-6 py-3 bg-rappi-main text-white font-bold text-lg rounded-xl shadow-md hover:bg-rappi-dark transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
-    >
-      {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
-      {isSubmitting ? 'Enviando...' : 'Registrar Visita'}
-    </button>
-
-    <p className="text-xs text-gray-500 mt-4 text-center">
-      *El registro se guarda de forma persistente en Firebase Firestore asociado a tu ID de usuario.
-    </p>
-  </form>
-);
+      <p className="text-xs text-gray-500 mt-4 text-center">
+        *El registro se guarda de forma persistente en Firebase Firestore asociado a tu ID de usuario.
+      </p>
+    </form>
+  );
+};
 
 const HistoryView = ({ visits, exportToCSV }) => (
   <div className="p-6 md:p-8 bg-white rounded-lg shadow-xl">
@@ -363,16 +470,8 @@ const HistoryView = ({ visits, exportToCSV }) => (
               <p className="text-lg font-semibold text-rappi-main truncate">
                 {visit.restaurantName} (ID: {visit.brandId})
               </p>
-              <div
-                className={`px-3 py-1 text-xs font-bold rounded-full ${
-                  visit.outcome?.includes('Exitosa')
-                    ? 'bg-green-100 text-green-700'
-                    : visit.outcome?.includes('Seguimiento')
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-red-100 text-red-700'
-                }`}
-              >
-                {visit.outcome}
+              <div className="px-3 py-1 text-xs font-bold rounded-full bg-white border border-gray-200 text-gray-700">
+                {visit.topOperatorLevel || '—'}
               </div>
             </div>
 
@@ -381,29 +480,64 @@ const HistoryView = ({ visits, exportToCSV }) => (
                 <span className="font-medium">Tipo:</span> {visit.visitType || 'Presencial'}
               </p>
               <p>
-                <span className="font-medium">KAM:</span> {visit.decisionMaker}
+                <span className="font-medium">Zona:</span> {visit.zone || '—'}
               </p>
               <p>
-                <span className="font-medium">Campañas:</span> {(visit.campaigns || []).join(', ')}
+                <span className="font-medium">Decision Maker:</span> {visit.decisionMaker || '—'}
               </p>
+              <p>
+                <span className="font-medium">Growth:</span> Viral Deals {visit.growthViralDeals || '—'} · Ads {visit.growthAds || '—'}
+              </p>
+
               <p className="text-xs text-gray-500 flex items-center">
                 <Clock className="w-3 h-3 mr-1" />
                 Registrada el:{' '}
                 {visit.checkInTime?.toDate ? visit.checkInTime.toDate().toLocaleDateString() : 'Cargando...'} a las{' '}
                 {visit.checkInTime?.toDate ? visit.checkInTime.toDate().toLocaleTimeString() : ''}
               </p>
+
               {visit.latitude && visit.latitude !== 'N/A' && (
                 <p className="text-xs text-gray-500">
                   Ubicación: Lat {Number(visit.latitude).toFixed(4)}, Lon {Number(visit.longitude).toFixed(4)}
                   {visit.locationSimulated && <span className="text-red-500 font-bold ml-1">(SIMULADA)</span>}
                 </p>
               )}
+
               {visit.photoEvidence && visit.photoEvidence !== 'N/A' && (
                 <p className="text-xs text-gray-500 flex items-center">
                   <Camera className="w-3 h-3 mr-1 text-gray-500" />
                   Evidencia: {visit.photoEvidence}
                 </p>
               )}
+
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs font-semibold text-gray-700">Ver bloques</summary>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Catálogo</div>
+                    <div>Fotos: {visit.catalogPhotos || '—'}</div>
+                    <div>Descripciones: {visit.catalogDescriptions || '—'}</div>
+                    <div>Menú/Toppings: {visit.catalogMenuStructure || '—'}</div>
+                    <div>Price Parity: {visit.priceParity ?? '—'}</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Markdown</div>
+                    <div>MD: {visit.mdStandard || '—'}</div>
+                    <div>MD PRO: {visit.mdPro || '—'}</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Top Operator</div>
+                    <div>Level: {visit.topOperatorLevel || '—'}</div>
+                    <div>Defect: {visit.topOperatorDefect || '—'}</div>
+                    <div>Cancel: {visit.topOperatorCancel || '—'}</div>
+                    <div>Availability: {visit.topOperatorAvailability || '—'}</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Detalle</div>
+                    <div className="whitespace-pre-wrap">{visit.details || '—'}</div>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         ))
@@ -445,38 +579,47 @@ const App = () => {
   const [error, setError] = useState(null);
 
   const [form, setForm] = useState({
+    // Info general
     visitType: 'Presencial',
+    zone: '',
+
+    // Restaurante
     brandId: '',
     restaurantName: '',
     decisionMaker: '',
-    brandOwner: '',
-    seaAds: '',
-    campaigns: [],
-    zone: '',
-    outcome: '',
-    details: '',
+
+    // Evidencia (solo virtual)
     photoEvidence: '',
+
+    // Bloque 1: Catálogo
+    catalogPhotos: '',
+    catalogDescriptions: '',
+    catalogMenuStructure: '',
+    priceParity: '',
+
+    // Bloque 2: Markdown
+    mdStandard: '',
+    mdPro: '',
+
+    // Bloque 3: Top Operator
+    topOperatorLevel: '',
+    topOperatorDefect: '',
+    topOperatorCancel: '',
+    topOperatorAvailability: '',
+
+    // Bloque 4: Growth
+    growthViralDeals: '',
+    growthAds: '',
+
+    // Detalle
+    details: '',
   });
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const campaignsOptions = useMemo(
-    () => ['Descuento en Productos', 'Bono Adquisición de Usuarios', 'Coinversión en Markdown', 'Viral Deals'],
-    [],
-  );
-
-  const brandOwnerOptions = useMemo(
-    () => [
-      'camilo.galeano@rappi.com',
-      'melany.florez@rappi.com',
-      'leidy.tibaquicha@rappi.com',
-      'jorge.castillo@rappi.com',
-      'michael.infante@rappi.com',
-    ],
-    [],
-  );
+  const zoneOptions = useMemo(() => ['Kennedy', 'Antonio Nariño', 'Suba', 'Engativá', 'Fontibon'], []);
 
   const showStatusModal = useCallback((message) => {
     setModalMessage(message);
@@ -487,16 +630,24 @@ const App = () => {
   const resetForm = useCallback(() => {
     setForm({
       visitType: 'Presencial',
+      zone: '',
       brandId: '',
       restaurantName: '',
       decisionMaker: '',
-      brandOwner: '',
-      seaAds: '',
-      campaigns: [],
-      zone: '',
-      outcome: '',
-      details: '',
       photoEvidence: '',
+      catalogPhotos: '',
+      catalogDescriptions: '',
+      catalogMenuStructure: '',
+      priceParity: '',
+      mdStandard: '',
+      mdPro: '',
+      topOperatorLevel: '',
+      topOperatorDefect: '',
+      topOperatorCancel: '',
+      topOperatorAvailability: '',
+      growthViralDeals: '',
+      growthAds: '',
+      details: '',
     });
     setLocation(null);
     setError(null);
@@ -556,23 +707,6 @@ const App = () => {
       return next;
     });
   }, []);
-
-  const handleCampaignToggle = useCallback(
-    (campaign) => {
-      setForm((prevForm) => {
-        const currentCampaigns = prevForm.campaigns;
-        if (currentCampaigns.includes(campaign)) {
-          return { ...prevForm, campaigns: currentCampaigns.filter((c) => c !== campaign) };
-        }
-        if (currentCampaigns.length < 2) {
-          return { ...prevForm, campaigns: [...currentCampaigns, campaign] };
-        }
-        showStatusModal('Solo puedes seleccionar un máximo de 2 tipos de campaña.');
-        return prevForm;
-      });
-    },
-    [showStatusModal],
-  );
 
   const handleLogin = useCallback(
     async (e) => {
@@ -660,6 +794,11 @@ const App = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!form.brandId || !form.restaurantName || !form.decisionMaker || !form.zone || !form.details) {
+      showStatusModal('Completa los campos obligatorios (Info General + Restaurante + Detalle).');
+      return;
+    }
+
     if (form.visitType === 'Presencial' && !location) {
       showStatusModal('Para una visita Presencial, por favor realiza el "Check-in" de ubicación.');
       return;
@@ -668,10 +807,7 @@ const App = () => {
       showStatusModal('Para una visita Virtual, es obligatorio adjuntar la evidencia (nombre/URL).');
       return;
     }
-    if (form.campaigns.length === 0) {
-      showStatusModal('Debes seleccionar al menos un Tipo de Campaña.');
-      return;
-    }
+
     if (!db || !userId) {
       setError('Debes iniciar sesión para registrar visitas.');
       return;
@@ -714,24 +850,32 @@ const App = () => {
     const headers = [
       'ID',
       'KAM ID',
+      'KAM Email',
       'Tipo Visita',
-      'Marca ID',
+      'Zona',
+      'Brand ID',
       'Nombre Restaurante',
       'Decision Maker',
-      'Brand Owner',
-      'Status Ads',
-      'Campañas',
-      'Zona',
-      'Resultado',
-      'Detalles',
-      'Foto Evidencia',
+      'Evidencia',
       'Latitud',
       'Longitud',
       'Ubicación Simulada',
+      'Catálogo Fotos',
+      'Catálogo Descripciones',
+      'Catálogo Menú/Toppings',
+      'Price Parity',
+      'MD',
+      'MD PRO',
+      'Top Operator Level',
+      'Defect',
+      'Cancel',
+      'Availability',
+      'Viral Deals',
+      'Ads',
+      'Detalles',
       'Timestamp',
     ];
 
-    // Sin '\n' ni '\r' para evitar copy/paste roto en Windows
     const csvEscape = (value) => {
       const s = (value ?? '').toString();
       const CR = String.fromCharCode(13);
@@ -747,20 +891,29 @@ const App = () => {
       const row = [
         visit.id,
         visit.kamId || 'N/A',
+        visit.kamEmail || 'N/A',
         visit.visitType || 'N/A',
-        visit.brandId,
-        visit.restaurantName,
-        visit.decisionMaker,
-        visit.brandOwner,
-        visit.seaAds,
-        (visit.campaigns || []).join('|'),
-        visit.zone,
-        visit.outcome,
-        csvEscape(visit.details || ''),
+        visit.zone || 'N/A',
+        visit.brandId || 'N/A',
+        visit.restaurantName || 'N/A',
+        visit.decisionMaker || 'N/A',
         visit.photoEvidence || 'N/A',
-        visit.latitude,
-        visit.longitude,
+        visit.latitude ?? 'N/A',
+        visit.longitude ?? 'N/A',
         visit.locationSimulated ? 'Sí' : 'No',
+        visit.catalogPhotos || 'N/A',
+        visit.catalogDescriptions || 'N/A',
+        visit.catalogMenuStructure || 'N/A',
+        visit.priceParity ?? 'N/A',
+        visit.mdStandard || 'N/A',
+        visit.mdPro || 'N/A',
+        visit.topOperatorLevel || 'N/A',
+        visit.topOperatorDefect || 'N/A',
+        visit.topOperatorCancel || 'N/A',
+        visit.topOperatorAvailability || 'N/A',
+        visit.growthViralDeals || 'N/A',
+        visit.growthAds || 'N/A',
+        csvEscape(visit.details || ''),
         visit.checkInTime?.toDate ? visit.checkInTime.toDate().toISOString() : 'N/A',
       ];
       csvRows.push(row.join(';'));
@@ -804,15 +957,16 @@ const App = () => {
           style={{ '--rappi-accent': rappiAccent }}
         >
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white/20">
-              <img src="/rappi-logo-512.png" alt="Rappi" className="w-8 h-8 object-contain" />
+            {/* 🔥 Logo (coloca tu archivo en /public. Ej: /rappi-logo.svg) */}
+            <div className="w-20 h-20 flex items-center justify-center rounded-2xl bg-white/20 shadow-inner">
+              <img src="/rappi-logo.svg" alt="Rappi" className="w-16 h-16 object-contain" />
             </div>
 
             <div>
               <h1 className="text-3xl font-extrabold flex items-center drop-shadow-sm">
                 Street Kams App <Target className="w-6 h-6 ml-3" />
               </h1>
-              <p className="mt-1 text-gray-100 drop-shadow-sm">Registro y Monitoreo de Visitas en Campo (KAM)</p>
+              <p className="mt-1 text-gray-100 drop-shadow-sm">Reporte de Visita de Restaurante (KAM)</p>
             </div>
           </div>
 
@@ -895,15 +1049,17 @@ const App = () => {
                   currentView === 'form' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                Formulario de Check-in
+                Formulario
               </button>
               <button
                 onClick={() => setCurrentView('history')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'history'
+                    ? 'bg-rappi-main text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                Historial de Visitas
+                Historial
               </button>
             </div>
 
@@ -918,9 +1074,7 @@ const App = () => {
                   location={location}
                   isSubmitting={isSubmitting}
                   error={error}
-                  campaignsOptions={campaignsOptions}
-                  brandOwnerOptions={brandOwnerOptions}
-                  handleCampaignToggle={handleCampaignToggle}
+                  zoneOptions={zoneOptions}
                 />
               ) : (
                 <HistoryView visits={visits} exportToCSV={exportToCSV} />
