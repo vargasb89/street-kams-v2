@@ -151,10 +151,7 @@ const FormView = ({
   return (
     <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 bg-white rounded-lg shadow-xl">
       <section className="border-b pb-4">
-        <SectionTitle
-          icon={<MapPin className="w-5 h-5 mr-2 text-rappi-main" />}
-          title="Información General"
-        />
+        <SectionTitle icon={<MapPin className="w-5 h-5 mr-2 text-rappi-main" />} title="Información General" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SelectField
@@ -201,7 +198,9 @@ const FormView = ({
                   <p className="text-xs text-gray-500">
                     Lat: {location.lat.toFixed(6)}, Lon: {location.lon.toFixed(6)}
                   </p>
-                  <p className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}>
+                  <p
+                    className={`text-xs mt-1 font-semibold ${location.isSimulated ? 'text-red-500' : 'text-green-600'}`}
+                  >
                     {location.isSimulated ? 'Simulada' : 'Real'} a las {location.time}
                   </p>
                 </div>
@@ -239,10 +238,7 @@ const FormView = ({
       </section>
 
       <section className="space-y-4">
-        <SectionTitle
-          icon={<ListOrdered className="w-5 h-5 mr-2 text-rappi-main" />}
-          title="Restaurante"
-        />
+        <SectionTitle icon={<ListOrdered className="w-5 h-5 mr-2 text-rappi-main" />} title="Restaurante" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <InputField
@@ -486,7 +482,8 @@ const HistoryView = ({ visits, exportToCSV }) => (
                 <span className="font-medium">Decision Maker:</span> {visit.decisionMaker || '—'}
               </p>
               <p>
-                <span className="font-medium">Growth:</span> Viral Deals {visit.growthViralDeals || '—'} · Ads {visit.growthAds || '—'}
+                <span className="font-medium">Growth:</span> Viral Deals {visit.growthViralDeals || '—'} · Ads{' '}
+                {visit.growthAds || '—'}
               </p>
 
               <p className="text-xs text-gray-500 flex items-center">
@@ -620,6 +617,9 @@ const App = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const zoneOptions = useMemo(() => ['Kennedy', 'Antonio Nariño', 'Suba', 'Engativá', 'Fontibon'], []);
+
+  // ✅ Logo: evita “imagen rota” y mantiene look
+  const [logoSrc, setLogoSrc] = useState('/rappi-logo.svg');
 
   const showStatusModal = useCallback((message) => {
     setModalMessage(message);
@@ -940,7 +940,10 @@ const App = () => {
   const userLabel = userEmail || userId || '—';
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans" style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}>
+    <div
+      className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans"
+      style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}
+    >
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
@@ -957,9 +960,17 @@ const App = () => {
           style={{ '--rappi-accent': rappiAccent }}
         >
           <div className="flex items-center gap-4">
-            {/* 🔥 Logo (coloca tu archivo en /public. Ej: /rappi-logo.svg) */}
-            <div className="w-20 h-20 flex items-center justify-center rounded-2xl bg-white/20 shadow-inner">
-              <img src="/rappi-logo.svg" alt="Rappi" className="w-16 h-16 object-contain" />
+            {/* ✅ Logo corregido (SVG en /public/rappi-logo.svg). Fallback: /rappi-logo.png */}
+            <div className="w-24 h-24 flex items-center justify-center rounded-3xl bg-white/20 backdrop-blur shadow-inner overflow-hidden">
+              <img
+                src={logoSrc}
+                alt="Rappi"
+                className="w-full h-full object-contain p-4 select-none"
+                draggable={false}
+                onError={() => {
+                  if (logoSrc !== '/rappi-logo.png') setLogoSrc('/rappi-logo.png');
+                }}
+              />
             </div>
 
             <div>
@@ -1054,9 +1065,7 @@ const App = () => {
               <button
                 onClick={() => setCurrentView('history')}
                 className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'history'
-                    ? 'bg-rappi-main text-white shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                  currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Historial
