@@ -14,10 +14,10 @@ import {
   Monitor,
   Camera,
   Shield,
-  Link as LinkIcon,
+  Filter,
 } from 'lucide-react';
 
-// --- CONFIGURACIÓN DE FIREBASE E IMPORTACIONES ---
+// --- FIREBASE ---
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
@@ -35,8 +35,16 @@ import {
   onSnapshot,
   serverTimestamp,
   collectionGroup,
+  orderBy,
+  where,
+  limit,
 } from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytes,
+  getDownloadURL,
+} from 'firebase/storage';
 
 // 🔥 FirebaseConfig (en producción muévelo a variables de entorno)
 const firebaseConfig = {
@@ -51,10 +59,12 @@ const firebaseConfig = {
 
 const APP_ID = 'street-kams-v2';
 
-// ✅ Define admins por UI (NO es seguridad). La seguridad real debe estar en Rules.
+// ✅ Admin por email (UI). Para seguridad real usa Custom Claims o colección admins + Rules.
 const ADMIN_EMAILS = ['bernardo.vargas@rappi.com'];
 
-// --- COMPONENTES UI REUTILIZABLES (MEMOIZADOS) ---
+// ----------------------------
+// UI COMPONENTS (memo)
+// ----------------------------
 
 const InputField = memo(
   ({
@@ -135,8 +145,6 @@ const TextAreaField = memo(({ label, name, value, onChange, required = false, pl
   </div>
 ));
 
-// --- COMPONENTES DE VISTA ---
-
 const LoadingState = () => (
   <div className="flex justify-center items-center p-8 bg-white rounded-xl shadow-lg mt-8">
     <Loader2 className="w-8 h-8 text-rappi-main animate-spin mr-3" />
@@ -151,16 +159,9 @@ const SectionTitle = memo(({ icon, title }) => (
   </h2>
 ));
 
-const Modal = ({ message, onClose }) => (
-  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-    <div className="bg-white rounded-xl shadow-lg p-4 max-w-md w-full flex items-start">
-      <div className="flex-1 text-sm text-gray-800 whitespace-pre-wrap">{message}</div>
-      <button type="button" className="ml-2 text-gray-500 hover:text-gray-800" onClick={onClose} aria-label="Cerrar">
-        <X className="w-4 h-4" />
-      </button>
-    </div>
-  </div>
-);
+// ----------------------------
+// FORM VIEW
+// ----------------------------
 
 const FormView = ({
   form,
@@ -256,7 +257,7 @@ const FormView = ({
               icon={<Camera className="w-4 h-4 text-gray-500" />}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Nota: En visita virtual, el check-in es opcional y se registra 'N/A' si no se realiza.
+              Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A' si no se realiza el check-in.
             </p>
           </div>
         )}
@@ -306,7 +307,14 @@ const FormView = ({
         <SectionTitle icon={<Camera className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 1: Catálogo" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SelectField label="Fotos" name="catalogPhotos" value={form.catalogPhotos} onChange={handleChange} options={catalogStatusOptions} required />
+          <SelectField
+            label="Fotos"
+            name="catalogPhotos"
+            value={form.catalogPhotos}
+            onChange={handleChange}
+            options={catalogStatusOptions}
+            required
+          />
           <SelectField
             label="Descripciones"
             name="catalogDescriptions"
@@ -336,8 +344,8 @@ const FormView = ({
         </div>
       </section>
 
-      {/* ✅ FIX: MD significa Markdown (no “Menú Digital”) */}
       <section className="space-y-4 border-t pt-6">
+        {/* ✅ FIX: MD = Markdown */}
         <SectionTitle icon={<Monitor className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 2: Markdown" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -364,9 +372,30 @@ const FormView = ({
         <SectionTitle icon={<Target className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 3: Top Operator" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SelectField label="Level" name="topOperatorLevel" value={form.topOperatorLevel} onChange={handleChange} options={topOperatorLevelOptions} required />
-          <SelectField label="Defect" name="topOperatorDefect" value={form.topOperatorDefect} onChange={handleChange} options={okImproveOptions} required />
-          <SelectField label="Cancel" name="topOperatorCancel" value={form.topOperatorCancel} onChange={handleChange} options={okImproveOptions} required />
+          <SelectField
+            label="Level"
+            name="topOperatorLevel"
+            value={form.topOperatorLevel}
+            onChange={handleChange}
+            options={topOperatorLevelOptions}
+            required
+          />
+          <SelectField
+            label="Defect"
+            name="topOperatorDefect"
+            value={form.topOperatorDefect}
+            onChange={handleChange}
+            options={okImproveOptions}
+            required
+          />
+          <SelectField
+            label="Cancel"
+            name="topOperatorCancel"
+            value={form.topOperatorCancel}
+            onChange={handleChange}
+            options={okImproveOptions}
+            required
+          />
           <SelectField
             label="Availability (Disponibilidad)"
             name="topOperatorAvailability"
@@ -382,8 +411,22 @@ const FormView = ({
         <SectionTitle icon={<Send className="w-5 h-5 mr-2 text-rappi-main" />} title="Bloque 4: Growth" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SelectField label="Viral Deals" name="growthViralDeals" value={form.growthViralDeals} onChange={handleChange} options={yesNoOptions} required />
-          <SelectField label="Ads (Publicidad)" name="growthAds" value={form.growthAds} onChange={handleChange} options={adsOptions} required />
+          <SelectField
+            label="Viral Deals"
+            name="growthViralDeals"
+            value={form.growthViralDeals}
+            onChange={handleChange}
+            options={yesNoOptions}
+            required
+          />
+          <SelectField
+            label="Ads (Publicidad)"
+            name="growthAds"
+            value={form.growthAds}
+            onChange={handleChange}
+            options={adsOptions}
+            required
+          />
         </div>
       </section>
 
@@ -418,40 +461,31 @@ const FormView = ({
         {isSubmitting ? 'Enviando...' : 'Registrar Visita'}
       </button>
 
-      <p className="text-xs text-gray-500 mt-4 text-center">*El registro se guarda en Firestore asociado a tu usuario.</p>
+      <p className="text-xs text-gray-500 mt-4 text-center">
+        *El registro se guarda de forma persistente en Firebase Firestore asociado a tu ID de usuario.
+      </p>
     </form>
   );
 };
 
-const HistoryView = ({ visits, exportToCSV, lastExportUrl }) => (
+// ----------------------------
+// HISTORY VIEW (USER)
+// ----------------------------
+
+const HistoryView = ({ visits, exportToCSV }) => (
   <div className="p-6 md:p-8 bg-white rounded-lg shadow-xl">
-    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6 border-b pb-4">
+    <div className="flex justify-between items-center mb-6 border-b pb-4">
       <h2 className="text-xl font-bold text-gray-800 flex items-center">
         <ListOrdered className="w-5 h-5 mr-2 text-rappi-main" /> Historial de Visitas ({visits.length})
       </h2>
-
-      <div className="flex items-center gap-2">
-        {lastExportUrl && (
-          <a
-            href={lastExportUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            title="Abrir CSV en Storage"
-          >
-            <LinkIcon className="w-4 h-4 mr-2" />
-            Abrir CSV
-          </a>
-        )}
-        <button
-          onClick={exportToCSV}
-          disabled={visits.length === 0}
-          className="flex items-center px-4 py-2 text-sm bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition duration-200 disabled:opacity-50"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Exportar a CSV
-        </button>
-      </div>
+      <button
+        onClick={exportToCSV}
+        disabled={visits.length === 0}
+        className="flex items-center px-4 py-2 text-sm bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition duration-200 disabled:opacity-50"
+      >
+        <Download className="w-4 h-4 mr-2" />
+        Exportar a CSV
+      </button>
     </div>
 
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
@@ -462,7 +496,10 @@ const HistoryView = ({ visits, exportToCSV, lastExportUrl }) => (
         </div>
       ) : (
         visits.map((visit) => (
-          <div key={visit.id} className="bg-gray-50 p-4 border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition duration-200">
+          <div
+            key={visit.id}
+            className="bg-gray-50 p-4 border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition duration-200"
+          >
             <div className="flex justify-between items-start mb-2">
               <p className="text-lg font-semibold text-rappi-main truncate">
                 {visit.restaurantName} (ID: {visit.brandId})
@@ -483,7 +520,8 @@ const HistoryView = ({ visits, exportToCSV, lastExportUrl }) => (
                 <span className="font-medium">Decision Maker:</span> {visit.decisionMaker || '—'}
               </p>
               <p>
-                <span className="font-medium">Growth:</span> Viral Deals {visit.growthViralDeals || '—'} · Ads {visit.growthAds || '—'}
+                <span className="font-medium">Growth:</span> Viral Deals {visit.growthViralDeals || '—'} · Ads{' '}
+                {visit.growthAds || '—'}
               </p>
 
               <p className="text-xs text-gray-500 flex items-center">
@@ -543,72 +581,213 @@ const HistoryView = ({ visits, exportToCSV, lastExportUrl }) => (
   </div>
 );
 
-const AdminView = ({ rows }) => (
-  <div className="p-6 md:p-8 bg-white rounded-lg shadow-xl">
-    <div className="flex justify-between items-center mb-6 border-b pb-4">
-      <h2 className="text-xl font-bold text-gray-800 flex items-center">
-        <Shield className="w-5 h-5 mr-2 text-rappi-main" /> Admin · Todas las visitas ({rows.length})
-      </h2>
-    </div>
+// ----------------------------
+// ADMIN VIEW (ALL VISITS)
+// ✅ FIX: collectionGroup('kams_visits')
+// ----------------------------
 
-    <div className="overflow-auto border border-gray-200 rounded-lg">
-      <table className="min-w-full text-xs">
-        <thead className="bg-gray-50">
-          <tr>
-            {['Fecha', 'KAM', 'Zona', 'Brand ID', 'Restaurante', 'MD', 'MD PRO', 'Top Level'].map((h) => (
-              <th key={h} className="text-left px-3 py-2 font-semibold text-gray-700 border-b">
-                {h}
-              </th>
+const AdminView = ({ visits, exportAdminToCSV, filters, setFilters, zoneOptions }) => {
+  const allKams = useMemo(() => {
+    const s = new Set();
+    visits.forEach((v) => {
+      const email = (v.kamEmail || '').toString().trim();
+      if (email) s.add(email);
+    });
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [visits]);
+
+  const filtered = useMemo(() => {
+    const { zone, kamEmail, q } = filters;
+    const needle = (q || '').trim().toLowerCase();
+
+    return visits.filter((v) => {
+      if (zone && (v.zone || '') !== zone) return false;
+      if (kamEmail && (v.kamEmail || '') !== kamEmail) return false;
+      if (needle) {
+        const hay = [
+          v.brandId,
+          v.restaurantName,
+          v.decisionMaker,
+          v.details,
+          v.kamEmail,
+          v.zone,
+        ]
+          .map((x) => (x ?? '').toString().toLowerCase())
+          .join(' ');
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [visits, filters]);
+
+  return (
+    <div className="p-6 md:p-8 bg-white rounded-lg shadow-xl">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4 border-b pb-4">
+        <h2 className="text-xl font-bold text-gray-800 flex items-center">
+          <Shield className="w-5 h-5 mr-2 text-rappi-main" /> Admin — Todas las visitas ({filtered.length})
+        </h2>
+
+        <button
+          onClick={() => exportAdminToCSV(filtered)}
+          disabled={filtered.length === 0}
+          className="flex items-center px-4 py-2 text-sm bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition duration-200 disabled:opacity-50"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Exportar CSV (Admin)
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        <div className="md:col-span-1">
+          <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+            <Filter className="w-3 h-3" /> Zona
+          </label>
+          <select
+            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+            value={filters.zone}
+            onChange={(e) => setFilters((p) => ({ ...p, zone: e.target.value }))}
+          >
+            <option value="">Todas</option>
+            {zoneOptions.map((z) => (
+              <option key={z} value={z}>
+                {z}
+              </option>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="odd:bg-white even:bg-gray-50">
-              <td className="px-3 py-2 border-b">
-                {r.checkInTime?.toDate ? r.checkInTime.toDate().toLocaleString() : '—'}
-              </td>
-              <td className="px-3 py-2 border-b">{r.kamEmail || r.kamId || '—'}</td>
-              <td className="px-3 py-2 border-b">{r.zone || '—'}</td>
-              <td className="px-3 py-2 border-b">{r.brandId || '—'}</td>
-              <td className="px-3 py-2 border-b">{r.restaurantName || '—'}</td>
-              <td className="px-3 py-2 border-b">{r.mdStandard || '—'}</td>
-              <td className="px-3 py-2 border-b">{r.mdPro || '—'}</td>
-              <td className="px-3 py-2 border-b">{r.topOperatorLevel || '—'}</td>
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td className="px-3 py-6 text-center text-gray-500" colSpan={8}>
-                No hay registros.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+          </select>
+        </div>
 
-    <p className="text-xs text-gray-500 mt-3">
-      Nota: para que esto sea seguro, la lectura global debe estar limitada por Rules (idealmente con custom claims).
-    </p>
+        <div className="md:col-span-1">
+          <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+            <User className="w-3 h-3" /> KAM
+          </label>
+          <select
+            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+            value={filters.kamEmail}
+            onChange={(e) => setFilters((p) => ({ ...p, kamEmail: e.target.value }))}
+          >
+            <option value="">Todos</option>
+            {allKams.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold text-gray-600">Buscar</label>
+          <input
+            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+            value={filters.q}
+            onChange={(e) => setFilters((p) => ({ ...p, q: e.target.value }))}
+            placeholder="brandId, restaurante, DM, detalles, email..."
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-2">
+        {filtered.length === 0 ? (
+          <div className="text-center p-10 bg-gray-50 rounded-lg">
+            <Target className="w-8 h-8 mx-auto text-gray-400 mb-3" />
+            <p className="text-gray-600">No hay visitas para los filtros seleccionados.</p>
+          </div>
+        ) : (
+          filtered.map((visit) => (
+            <div key={`${visit.kamId || 'na'}_${visit.id}`} className="bg-gray-50 p-4 border border-gray-200 rounded-xl">
+              <div className="flex justify-between items-start gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm text-gray-500">{visit.kamEmail || 'KAM N/A'}</div>
+                  <div className="text-lg font-semibold text-gray-800 truncate">
+                    {visit.restaurantName || '—'} <span className="text-gray-500">(ID: {visit.brandId || '—'})</span>
+                  </div>
+                  <div className="text-sm text-gray-600">Zona: {visit.zone || '—'} · Tipo: {visit.visitType || '—'}</div>
+                </div>
+
+                <div className="shrink-0 text-xs font-bold rounded-full bg-white border border-gray-200 text-gray-700 px-3 py-1">
+                  {visit.topOperatorLevel || '—'}
+                </div>
+              </div>
+
+              <div className="mt-2 text-sm text-gray-700">
+                <span className="font-semibold">DM:</span> {visit.decisionMaker || '—'}
+              </div>
+
+              <div className="mt-1 text-xs text-gray-500 flex items-center">
+                <Clock className="w-3 h-3 mr-1" />
+                {visit.checkInTime?.toDate ? visit.checkInTime.toDate().toLocaleString() : 'N/A'}
+              </div>
+
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs font-semibold text-gray-700">Ver detalle</summary>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Catálogo</div>
+                    <div>Fotos: {visit.catalogPhotos || '—'}</div>
+                    <div>Descripciones: {visit.catalogDescriptions || '—'}</div>
+                    <div>Menú/Toppings: {visit.catalogMenuStructure || '—'}</div>
+                    <div>Price Parity: {visit.priceParity ?? '—'}</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Markdown</div>
+                    <div>MD: {visit.mdStandard || '—'}</div>
+                    <div>MD PRO: {visit.mdPro || '—'}</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Top Operator</div>
+                    <div>Level: {visit.topOperatorLevel || '—'}</div>
+                    <div>Defect: {visit.topOperatorDefect || '—'}</div>
+                    <div>Cancel: {visit.topOperatorCancel || '—'}</div>
+                    <div>Availability: {visit.topOperatorAvailability || '—'}</div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-2">
+                    <div className="font-semibold text-gray-800 mb-1">Detalle</div>
+                    <div className="whitespace-pre-wrap">{visit.details || '—'}</div>
+                  </div>
+                </div>
+              </details>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ----------------------------
+// MODAL
+// ----------------------------
+
+const Modal = ({ message, onClose }) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
+    <div className="bg-white rounded-xl shadow-lg p-4 max-w-sm w-full flex items-start">
+      <div className="flex-1 text-sm text-gray-800">{message}</div>
+      <button type="button" className="ml-2 text-gray-500 hover:text-gray-800" onClick={onClose} aria-label="Cerrar">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
   </div>
 );
+
+// ----------------------------
+// MAIN APP
+// ----------------------------
 
 const App = () => {
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
   const [storage, setStorage] = useState(null);
 
-  // Firebase UID
   const [userId, setUserId] = useState(null);
-
-  // Email visible
   const [userEmail, setUserEmail] = useState('');
 
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [visits, setVisits] = useState([]);
 
+  const [adminVisits, setAdminVisits] = useState([]);
+  const [adminFilters, setAdminFilters] = useState({ zone: '', kamEmail: '', q: '' });
+
   const [currentView, setCurrentView] = useState('form'); // form | history | admin
+
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [location, setLocation] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -616,43 +795,32 @@ const App = () => {
   const [modalMessage, setModalMessage] = useState('');
   const [error, setError] = useState(null);
 
-  const [adminRows, setAdminRows] = useState([]);
-  const [lastExportUrl, setLastExportUrl] = useState('');
-
   const [form, setForm] = useState({
-    // Info general
     visitType: 'Presencial',
     zone: '',
 
-    // Restaurante
     brandId: '',
     restaurantName: '',
     decisionMaker: '',
 
-    // Evidencia (solo virtual)
     photoEvidence: '',
 
-    // Bloque 1: Catálogo
     catalogPhotos: '',
     catalogDescriptions: '',
     catalogMenuStructure: '',
     priceParity: '',
 
-    // Bloque 2: Markdown
     mdStandard: '',
     mdPro: '',
 
-    // Bloque 3: Top Operator
     topOperatorLevel: '',
     topOperatorDefect: '',
     topOperatorCancel: '',
     topOperatorAvailability: '',
 
-    // Bloque 4: Growth
     growthViralDeals: '',
     growthAds: '',
 
-    // Detalle
     details: '',
   });
 
@@ -662,13 +830,13 @@ const App = () => {
 
   const zoneOptions = useMemo(() => ['Kennedy', 'Antonio Nariño', 'Suba', 'Engativá', 'Fontibon'], []);
 
-  // ✅ Logo (tu archivo real en /public)
+  // ✅ Logo PNG en /public
   const [logoSrc, setLogoSrc] = useState('/rappi-logo-512.png');
 
   const showStatusModal = useCallback((message) => {
     setModalMessage(message);
     setShowModal(true);
-    setTimeout(() => setShowModal(false), 3500);
+    setTimeout(() => setShowModal(false), 3000);
   }, []);
 
   const resetForm = useCallback(() => {
@@ -752,6 +920,91 @@ const App = () => {
     });
   }, []);
 
+  // --- INIT FIREBASE ---
+  useEffect(() => {
+    try {
+      const app = initializeApp(firebaseConfig);
+      const authInstance = getAuth(app);
+      const dbInstance = getFirestore(app);
+      const storageInstance = getStorage(app);
+
+      // ✅ Persistencia de sesión (no se pierde al refresh)
+      setPersistence(authInstance, browserLocalPersistence).catch(() => {
+        // no-op
+      });
+
+      setAuth(authInstance);
+      setDb(dbInstance);
+      setStorage(storageInstance);
+
+      const unsubscribe = onAuthStateChanged(authInstance, (user) => {
+        setUserId(user ? user.uid : null);
+        setUserEmail(user?.email || '');
+        setIsAuthReady(true);
+      });
+
+      return () => unsubscribe();
+    } catch (e) {
+      console.error('Error al inicializar Firebase:', e);
+      setError('La configuración de Firebase no está disponible. Los datos no serán persistentes.');
+      setIsAuthReady(true);
+    }
+  }, []);
+
+  const isAdmin = useMemo(() => {
+    const email = (userEmail || '').toLowerCase().trim();
+    return ADMIN_EMAILS.map((x) => x.toLowerCase().trim()).includes(email);
+  }, [userEmail]);
+
+  // --- LISTENER VISITS (USER) ---
+  useEffect(() => {
+    if (!db || !userId) return;
+
+    const collectionPath = `artifacts/${APP_ID}/users/${userId}/kams_visits`;
+    const q = query(collection(db, collectionPath));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        data.sort((a, b) => (b.checkInTime?.toDate?.() || 0) - (a.checkInTime?.toDate?.() || 0));
+        setVisits(data);
+      },
+      (e) => {
+        console.error('Error al cargar visitas:', e);
+        setError('Error al cargar el historial de visitas.');
+      },
+    );
+
+    return () => unsubscribe();
+  }, [db, userId]);
+
+  // --- LISTENER VISITS (ADMIN) ---
+  // ✅ FIX: lee TODAS las visitas con collectionGroup('kams_visits')
+  useEffect(() => {
+    if (!db || !isAdmin) {
+      setAdminVisits([]);
+      return;
+    }
+
+    const qAdmin = query(collectionGroup(db, 'kams_visits'), orderBy('checkInTime', 'desc'), limit(2000));
+
+    const unsubscribe = onSnapshot(
+      qAdmin,
+      (snapshot) => {
+        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAdminVisits(data);
+      },
+      (e) => {
+        console.error('Error admin (collectionGroup):', e);
+        // Si acá aparece PERMISSION_DENIED, es Rules (admin read) no code.
+        setError(`Admin: no se pudieron leer las visitas globales. (${e?.code || 'error'})`);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [db, isAdmin]);
+
   const handleLogin = useCallback(
     async (e) => {
       e.preventDefault();
@@ -781,8 +1034,7 @@ const App = () => {
       setUserId(null);
       setUserEmail('');
       setVisits([]);
-      setAdminRows([]);
-      setLastExportUrl('');
+      setAdminVisits([]);
       setCurrentView('form');
       showStatusModal('Sesión cerrada.');
     } catch (e) {
@@ -790,86 +1042,6 @@ const App = () => {
       setError('No se pudo cerrar sesión.');
     }
   }, [auth, showStatusModal]);
-
-  const isAdmin = useMemo(() => {
-    if (!userEmail) return false;
-    return ADMIN_EMAILS.includes(userEmail.toLowerCase());
-  }, [userEmail]);
-
-  // --- INIT FIREBASE ---
-  useEffect(() => {
-    (async () => {
-      try {
-        const app = initializeApp(firebaseConfig);
-        const authInstance = getAuth(app);
-        const dbInstance = getFirestore(app);
-        const storageInstance = getStorage(app);
-
-        // ✅ Persistencia: evita que se "pierda" sesión al refresh
-        await setPersistence(authInstance, browserLocalPersistence);
-
-        setAuth(authInstance);
-        setDb(dbInstance);
-        setStorage(storageInstance);
-
-        const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-          setUserId(user ? user.uid : null);
-          setUserEmail(user?.email || '');
-          setIsAuthReady(true);
-        });
-
-        return () => unsubscribe();
-      } catch (e) {
-        console.error('Error al inicializar Firebase:', e);
-        setError('La configuración de Firebase no está disponible.');
-        setIsAuthReady(true);
-      }
-    })();
-  }, []);
-
-  // --- LISTENER VISITS (por usuario) ---
-  useEffect(() => {
-    if (!db || !userId) return;
-
-    const collectionPath = `artifacts/${APP_ID}/users/${userId}/kams_visits`;
-    const q = query(collection(db, collectionPath));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        data.sort((a, b) => (b.checkInTime?.toDate?.() || 0) - (a.checkInTime?.toDate?.() || 0));
-        setVisits(data);
-      },
-      (e) => {
-        console.error('Error al cargar visitas:', e);
-        setError('Error al cargar el historial de visitas. Revisa tus Rules.');
-      },
-    );
-
-    return () => unsubscribe();
-  }, [db, userId]);
-
-  // --- ADMIN LISTENER (collectionGroup) ---
-  useEffect(() => {
-    if (!db || !userId || !isAdmin) return;
-
-    const q = query(collectionGroup(db, 'kams_visits'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const rows = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        rows.sort((a, b) => (b.checkInTime?.toDate?.() || 0) - (a.checkInTime?.toDate?.() || 0));
-        setAdminRows(rows);
-      },
-      (e) => {
-        console.error('Error admin collectionGroup:', e);
-        // Si tus Rules ya bloquearon collectionGroup (recomendado), esto puede fallar hasta que pongas custom claims.
-      },
-    );
-
-    return () => unsubscribe();
-  }, [db, userId, isAdmin]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -914,14 +1086,15 @@ const App = () => {
       resetForm();
     } catch (e) {
       console.error('Error al guardar en Firestore:', e);
-      setError('Error al guardar la visita. Revisa tus Rules de Firestore.');
+      setError('Error al guardar la visita. Inténtalo de nuevo.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // ✅ CSV export + subida a Firebase Storage
-  const exportToCSV = useCallback(async () => {
+  // ✅ CSV export (BLINDADO PARA WINDOWS / VERCEL)
+  // + guarda el CSV también en Firebase Storage
+  const exportToCSV = async () => {
     if (visits.length === 0) {
       showStatusModal('No hay datos para exportar.');
       return;
@@ -1006,31 +1179,113 @@ const App = () => {
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    const fileName = `Visitas_KAM_Exportado_${new Date().toISOString().slice(0, 10)}_${new Date()
-      .toISOString()
-      .slice(11, 19)
-      .replaceAll(':', '-')}.csv`;
-    link.download = fileName;
+    link.download = `Visitas_KAM_Exportado_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    // 2) Subida a Storage
+    // 2) Guarda en Storage
     try {
-      if (!storage || !userId) throw new Error('Storage o userId no disponibles');
-
-      const path = `artifacts/${APP_ID}/exports/${userId}/${fileName}`;
-      const fileRef = storageRef(storage, path);
-      await uploadBytes(fileRef, blob, { contentType: 'text/csv' });
-      const url = await getDownloadURL(fileRef);
-      setLastExportUrl(url);
-
-      showStatusModal(`📥 CSV descargado y guardado en Firebase Storage.\n\nRuta: ${path}`);
+      if (storage && userId) {
+        const path = `csv_exports/${userId}/Visitas_KAM_${new Date().toISOString().slice(0, 10)}_${Date.now()}.csv`;
+        const r = storageRef(storage, path);
+        await uploadBytes(r, blob, { contentType: 'text/csv' });
+        const url = await getDownloadURL(r);
+        console.log('CSV subido a Storage:', url);
+      }
     } catch (e) {
-      console.error('Error subiendo CSV a Storage:', e);
-      showStatusModal('📥 CSV descargado.\n⚠️ No se pudo guardar en Storage (revisa Rules de Storage).');
+      console.warn('No se pudo subir CSV a Storage:', e);
     }
-  }, [visits, storage, userId, showStatusModal]);
+
+    showStatusModal('📥 CSV exportado (y guardado en Storage si está configurado).');
+  };
+
+  // Admin export
+  const exportAdminToCSV = async (rows) => {
+    const headers = [
+      'ID',
+      'KAM ID',
+      'KAM Email',
+      'Tipo Visita',
+      'Zona',
+      'Brand ID',
+      'Nombre Restaurante',
+      'Decision Maker',
+      'Evidencia',
+      'Latitud',
+      'Longitud',
+      'Ubicación Simulada',
+      'Catálogo Fotos',
+      'Catálogo Descripciones',
+      'Catálogo Menú/Toppings',
+      'Price Parity',
+      'MD',
+      'MD PRO',
+      'Top Operator Level',
+      'Defect',
+      'Cancel',
+      'Availability',
+      'Viral Deals',
+      'Ads',
+      'Detalles',
+      'Timestamp',
+    ];
+
+    const csvEscape = (value) => {
+      const s = (value ?? '').toString();
+      const CR = String.fromCharCode(13);
+      const LF = String.fromCharCode(10);
+      const noCR = s.replaceAll(CR, '');
+      const oneLine = noCR.replaceAll(LF, ' ');
+      return '"' + oneLine.replaceAll('"', '""') + '"';
+    };
+
+    const csvRows = [headers.join(';')];
+    rows.forEach((visit) => {
+      const row = [
+        visit.id,
+        visit.kamId || 'N/A',
+        visit.kamEmail || 'N/A',
+        visit.visitType || 'N/A',
+        visit.zone || 'N/A',
+        visit.brandId || 'N/A',
+        visit.restaurantName || 'N/A',
+        visit.decisionMaker || 'N/A',
+        visit.photoEvidence || 'N/A',
+        visit.latitude ?? 'N/A',
+        visit.longitude ?? 'N/A',
+        visit.locationSimulated ? 'Sí' : 'No',
+        visit.catalogPhotos || 'N/A',
+        visit.catalogDescriptions || 'N/A',
+        visit.catalogMenuStructure || 'N/A',
+        visit.priceParity ?? 'N/A',
+        visit.mdStandard || 'N/A',
+        visit.mdPro || 'N/A',
+        visit.topOperatorLevel || 'N/A',
+        visit.topOperatorDefect || 'N/A',
+        visit.topOperatorCancel || 'N/A',
+        visit.topOperatorAvailability || 'N/A',
+        visit.growthViralDeals || 'N/A',
+        visit.growthAds || 'N/A',
+        csvEscape(visit.details || ''),
+        visit.checkInTime?.toDate ? visit.checkInTime.toDate().toISOString() : 'N/A',
+      ];
+      csvRows.push(row.join(';'));
+    });
+
+    const LF = String.fromCharCode(10);
+    const csvString = csvRows.join(LF);
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Visitas_ADMIN_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showStatusModal('📥 CSV Admin exportado.');
+  };
 
   const rappiMain = '#FF5500';
   const rappiDark = '#D84800';
@@ -1039,7 +1294,10 @@ const App = () => {
   const userLabel = userEmail || userId || '—';
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans" style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}>
+    <div
+      className="min-h-screen bg-gray-100 p-4 sm:p-8 font-sans"
+      style={{ '--rappi-main': rappiMain, '--rappi-dark': rappiDark }}
+    >
       <style>{`
         .font-sans { font-family: 'Inter', sans-serif; }
         .bg-rappi-main { background-color: var(--rappi-main); }
@@ -1051,7 +1309,10 @@ const App = () => {
       `}</style>
 
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white" style={{ '--rappi-accent': rappiAccent }}>
+        <header
+          className="mb-8 p-6 rounded-xl shadow-lg border-b-4 border-rappi-dark rappi-header-bg text-white"
+          style={{ '--rappi-accent': rappiAccent }}
+        >
           <div className="flex items-center gap-4">
             <div className="w-24 h-24 flex items-center justify-center rounded-3xl bg-white/20 backdrop-blur shadow-inner overflow-hidden">
               <img
@@ -1060,6 +1321,7 @@ const App = () => {
                 className="w-full h-full object-contain p-4 select-none"
                 draggable={false}
                 onError={() => {
+                  // fallback opcional si renombraste el archivo
                   if (logoSrc !== '/rappi-logo.png') setLogoSrc('/rappi-logo.png');
                 }}
               />
@@ -1136,7 +1398,11 @@ const App = () => {
               <div className="text-sm text-gray-700">
                 Sesión iniciada como <span className="font-semibold">{userLabel}</span>
               </div>
-              <button type="button" onClick={handleLogout} className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100"
+              >
                 Cerrar sesión
               </button>
             </div>
@@ -1184,9 +1450,15 @@ const App = () => {
                   zoneOptions={zoneOptions}
                 />
               ) : currentView === 'history' ? (
-                <HistoryView visits={visits} exportToCSV={exportToCSV} lastExportUrl={lastExportUrl} />
+                <HistoryView visits={visits} exportToCSV={exportToCSV} />
               ) : (
-                <AdminView rows={adminRows} />
+                <AdminView
+                  visits={adminVisits}
+                  exportAdminToCSV={exportAdminToCSV}
+                  filters={adminFilters}
+                  setFilters={setAdminFilters}
+                  zoneOptions={zoneOptions}
+                />
               )}
             </div>
           </>
