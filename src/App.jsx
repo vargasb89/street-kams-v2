@@ -15,6 +15,8 @@ import {
   Camera,
   Shield,
   Filter,
+  Link as LinkIcon, // Icono para el link
+  Unlock // Icono para acceso admin sin login
 } from 'lucide-react';
 
 // --- FIREBASE ---
@@ -26,6 +28,8 @@ import {
   signOut,
   setPersistence,
   browserLocalPersistence,
+  signInWithCustomToken, 
+  signInAnonymously
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -242,22 +246,23 @@ const FormView = ({
           </div>
         )}
 
+        {/* --- CAMBIO: Link de Reunión en vez de Foto --- */}
         {form.visitType === 'Virtual' && (
           <div className="mt-4 p-4 border border-gray-200 rounded-lg space-y-3">
             <h3 className="font-semibold flex items-center text-gray-700">
               <Monitor className="w-4 h-4 mr-2" /> Evidencia Virtual (Obligatoria)
             </h3>
             <InputField
-              label="Foto de Evidencia (Nombre del archivo o URL)"
-              name="photoEvidence"
-              value={form.photoEvidence}
+              label="Link de la Reunión"
+              name="meetingLink"
+              value={form.meetingLink}
               onChange={handleChange}
               required
-              placeholder="Ej: captura-meeting-zoom.png o enlace a la foto"
-              icon={<Camera className="w-4 h-4 text-gray-500" />}
+              placeholder="Ej: https://meet.google.com/abc-defg-hij"
+              icon={<LinkIcon className="w-4 h-4 text-gray-500" />}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A' si no se realiza el check-in.
+              Nota: En esta simulación, la geolocalización es opcional y se registra 'N/A'.
             </p>
           </div>
         )}
@@ -453,7 +458,7 @@ const FormView = ({
           !form.zone ||
           !form.details ||
           (form.visitType === 'Presencial' && !location) ||
-          (form.visitType === 'Virtual' && !form.photoEvidence.trim())
+          (form.visitType === 'Virtual' && !form.meetingLink.trim())
         }
         className="w-full flex items-center justify-center px-6 py-3 bg-rappi-main text-white font-bold text-lg rounded-xl shadow-md hover:bg-rappi-dark transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
       >
@@ -538,7 +543,14 @@ const HistoryView = ({ visits, exportToCSV }) => (
                 </p>
               )}
 
-              {visit.photoEvidence && visit.photoEvidence !== 'N/A' && (
+              {visit.meetingLink && visit.meetingLink !== 'N/A' && (
+                 <p className="text-xs text-gray-500 flex items-center overflow-hidden">
+                    <LinkIcon className="w-3 h-3 mr-1 text-gray-500 shrink-0" />
+                    Link Reunión: <a href={visit.meetingLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline ml-1 truncate">{visit.meetingLink}</a>
+                 </p>
+              )}
+              {/* Compatibilidad hacia atrás con fotos */}
+              {visit.photoEvidence && visit.photoEvidence !== 'N/A' && !visit.meetingLink && (
                 <p className="text-xs text-gray-500 flex items-center">
                   <Camera className="w-3 h-3 mr-1 text-gray-500" />
                   Evidencia: {visit.photoEvidence}
@@ -717,6 +729,17 @@ const AdminView = ({ visits, exportAdminToCSV, filters, setFilters, zoneOptions 
                 {visit.checkInTime?.toDate ? visit.checkInTime.toDate().toLocaleString() : 'N/A'}
               </div>
 
+              {/* Mostrar link o evidencia en Admin también */}
+              <div className="mt-1 text-xs text-blue-600 truncate">
+                {visit.meetingLink && visit.meetingLink !== 'N/A' ? (
+                   <a href={visit.meetingLink} target="_blank" rel="noopener noreferrer" className="underline">
+                     Link Reunión: {visit.meetingLink}
+                   </a>
+                ) : visit.photoEvidence ? (
+                   <span className="text-gray-500">Foto: {visit.photoEvidence}</span>
+                ) : null}
+              </div>
+
               <details className="mt-2">
                 <summary className="cursor-pointer text-xs font-semibold text-gray-700">Ver detalle</summary>
                 <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
@@ -794,6 +817,9 @@ const App = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [error, setError] = useState(null);
+  
+  // ✅ Nuevo estado para acceso Admin "bypass"
+  const [isGuestAdmin, setIsGuestAdmin] = useState(false);
 
   const [form, setForm] = useState({
     visitType: 'Presencial',
@@ -803,7 +829,8 @@ const App = () => {
     restaurantName: '',
     decisionMaker: '',
 
-    photoEvidence: '',
+    photoEvidence: '', // Se mantiene para compatibilidad
+    meetingLink: '', // ✅ Nuevo campo
 
     catalogPhotos: '',
     catalogDescriptions: '',
@@ -847,6 +874,7 @@ const App = () => {
       restaurantName: '',
       decisionMaker: '',
       photoEvidence: '',
+      meetingLink: '',
       catalogPhotos: '',
       catalogDescriptions: '',
       catalogMenuStructure: '',
@@ -915,6 +943,7 @@ const App = () => {
       if (name === 'visitType') {
         if (value === 'Virtual') setLocation(null);
         next.photoEvidence = '';
+        next.meetingLink = '';
       }
       return next;
     });
@@ -932,6 +961,15 @@ const App = () => {
       setPersistence(authInstance, browserLocalPersistence).catch(() => {
         // no-op
       });
+      
+      const initAuth = async () => {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(authInstance, __initial_auth_token);
+          } else {
+            // No hacemos nada para el usuario tenga que hacer login
+          }
+        };
+        initAuth();
 
       setAuth(authInstance);
       setDb(dbInstance);
@@ -951,10 +989,19 @@ const App = () => {
     }
   }, []);
 
+  // ✅ Admin Check: incluye emails hardcodeados O el modo invitado
   const isAdmin = useMemo(() => {
+    if (isGuestAdmin) return true;
     const email = (userEmail || '').toLowerCase().trim();
     return ADMIN_EMAILS.map((x) => x.toLowerCase().trim()).includes(email);
-  }, [userEmail]);
+  }, [userEmail, isGuestAdmin]);
+
+  // ✅ Si activa modo admin invitado y no está logueado, forzamos vista Admin
+  useEffect(() => {
+     if (isGuestAdmin) {
+       setCurrentView('admin');
+     }
+  }, [isGuestAdmin]);
 
   // --- LISTENER VISITS (USER) ---
   useEffect(() => {
@@ -972,7 +1019,7 @@ const App = () => {
       },
       (e) => {
         console.error('Error al cargar visitas:', e);
-        setError('Error al cargar el historial de visitas.');
+        // setError('Error al cargar el historial de visitas.');
       },
     );
 
@@ -997,8 +1044,9 @@ const App = () => {
       },
       (e) => {
         console.error('Error admin (collectionGroup):', e);
-        // Si acá aparece PERMISSION_DENIED, es Rules (admin read) no code.
-        setError(`Admin: no se pudieron leer las visitas globales. (${e?.code || 'error'})`);
+        // Si hay error de permisos (porque no está logueado como user real), es esperado en modo invitado si las reglas son estrictas.
+        // Pero asumimos reglas laxas para canvas.
+        setError(`Admin: no se pudieron leer las visitas globales. Asegúrate de estar autenticado (incluso anónimamente). (${e?.code})`);
       },
     );
 
@@ -1027,12 +1075,29 @@ const App = () => {
     [auth, loginEmail, loginPassword, showStatusModal],
   );
 
+  const handleGuestAdmin = useCallback(async () => {
+     if (!auth) return;
+     setIsLoggingIn(true);
+     try {
+       // Necesitamos autenticación (aunque sea anónima) para que Firestore funcione
+       await signInAnonymously(auth);
+       setIsGuestAdmin(true);
+       showStatusModal('Entrando como Admin Invitado (Solo Lectura)');
+     } catch (e) {
+       console.error("Error anon auth:", e);
+       setError("No se pudo entrar como invitado.");
+     } finally {
+       setIsLoggingIn(false);
+     }
+  }, [auth, showStatusModal]);
+
   const handleLogout = useCallback(async () => {
     if (!auth) return;
     try {
       await signOut(auth);
       setUserId(null);
       setUserEmail('');
+      setIsGuestAdmin(false); // Reset guest admin
       setVisits([]);
       setAdminVisits([]);
       setCurrentView('form');
@@ -1055,8 +1120,10 @@ const App = () => {
       showStatusModal('Para una visita Presencial, por favor realiza el "Check-in" de ubicación.');
       return;
     }
-    if (form.visitType === 'Virtual' && !form.photoEvidence.trim()) {
-      showStatusModal('Para una visita Virtual, es obligatorio adjuntar la evidencia (nombre/URL).');
+    
+    // ✅ Validar Link en vez de foto
+    if (form.visitType === 'Virtual' && !form.meetingLink.trim()) {
+      showStatusModal('Para una visita Virtual, es obligatorio ingresar el Link de la Reunión.');
       return;
     }
 
@@ -1109,7 +1176,8 @@ const App = () => {
       'Brand ID',
       'Nombre Restaurante',
       'Decision Maker',
-      'Evidencia',
+      'Evidencia/Link', // Combined or new col
+      'Link Reunión', // New col
       'Latitud',
       'Longitud',
       'Ubicación Simulada',
@@ -1151,6 +1219,7 @@ const App = () => {
         visit.restaurantName || 'N/A',
         visit.decisionMaker || 'N/A',
         visit.photoEvidence || 'N/A',
+        visit.meetingLink || 'N/A', // New Data
         visit.latitude ?? 'N/A',
         visit.longitude ?? 'N/A',
         visit.locationSimulated ? 'Sí' : 'No',
@@ -1211,7 +1280,8 @@ const App = () => {
       'Brand ID',
       'Nombre Restaurante',
       'Decision Maker',
-      'Evidencia',
+      'Evidencia Foto',
+      'Link Reunión', // Added
       'Latitud',
       'Longitud',
       'Ubicación Simulada',
@@ -1252,6 +1322,7 @@ const App = () => {
         visit.restaurantName || 'N/A',
         visit.decisionMaker || 'N/A',
         visit.photoEvidence || 'N/A',
+        visit.meetingLink || 'N/A', // Added
         visit.latitude ?? 'N/A',
         visit.longitude ?? 'N/A',
         visit.locationSimulated ? 'Sí' : 'No',
@@ -1291,7 +1362,7 @@ const App = () => {
   const rappiDark = '#D84800';
   const rappiAccent = '#FF7B4D';
 
-  const userLabel = userEmail || userId || '—';
+  const userLabel = isGuestAdmin ? 'Admin Invitado' : (userEmail || userId || '—');
 
   return (
     <div
@@ -1389,6 +1460,23 @@ const App = () => {
                 {isLoggingIn ? 'Iniciando sesión...' : 'Entrar'}
               </button>
 
+              <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-gray-300"></div>
+                  <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">O ingresa como</span>
+                  <div className="flex-grow border-t border-gray-300"></div>
+              </div>
+
+               {/* ✅ Botón de Acceso Admin Bypass */}
+              <button
+                type="button"
+                onClick={handleGuestAdmin}
+                disabled={isLoggingIn}
+                className="w-full flex items-center justify-center px-6 py-3 bg-gray-800 text-white font-bold text-lg rounded-xl shadow-md hover:bg-gray-900 transition duration-300 disabled:bg-gray-400"
+              >
+                 <Unlock className="w-5 h-5 mr-2" />
+                 Acceso Administrador (Solo Lectura)
+              </button>
+
               <p className="text-xs text-gray-500 text-center">* Activa Email/Password en Firebase Console → Authentication.</p>
             </form>
           </div>
@@ -1408,22 +1496,28 @@ const App = () => {
             </div>
 
             <div className="mb-6 flex space-x-2 p-1 bg-white rounded-xl shadow-inner">
-              <button
-                onClick={() => setCurrentView('form')}
-                className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'form' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                Formulario
-              </button>
-              <button
-                onClick={() => setCurrentView('history')}
-                className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
-                  currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                Historial
-              </button>
+               {/* Si es Guest Admin, ocultar Formulario e Historial propio, solo mostrar Admin */}
+              {!isGuestAdmin && (
+                <>
+                  <button
+                    onClick={() => setCurrentView('form')}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
+                      currentView === 'form' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Formulario
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('history')}
+                    className={`flex-1 py-3 px-4 rounded-lg font-bold transition-colors duration-200 text-sm ${
+                      currentView === 'history' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Historial
+                  </button>
+                </>
+              )}
+              
               {isAdmin && (
                 <button
                   onClick={() => setCurrentView('admin')}
@@ -1431,13 +1525,13 @@ const App = () => {
                     currentView === 'admin' ? 'bg-rappi-main text-white shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  Admin
+                  Admin Global
                 </button>
               )}
             </div>
 
             <div className="mt-4">
-              {currentView === 'form' ? (
+              {currentView === 'form' && !isGuestAdmin ? (
                 <FormView
                   form={form}
                   handleSubmit={handleSubmit}
@@ -1449,9 +1543,9 @@ const App = () => {
                   error={error}
                   zoneOptions={zoneOptions}
                 />
-              ) : currentView === 'history' ? (
+              ) : currentView === 'history' && !isGuestAdmin ? (
                 <HistoryView visits={visits} exportToCSV={exportToCSV} />
-              ) : (
+              ) : isAdmin ? (
                 <AdminView
                   visits={adminVisits}
                   exportAdminToCSV={exportAdminToCSV}
@@ -1459,6 +1553,8 @@ const App = () => {
                   setFilters={setAdminFilters}
                   zoneOptions={zoneOptions}
                 />
+              ) : (
+                <div className="p-8 text-center text-gray-500">Selecciona una vista válida.</div>
               )}
             </div>
           </>
